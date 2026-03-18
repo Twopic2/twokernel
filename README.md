@@ -2,6 +2,11 @@
 
 A hobbyist monolithic kernel written in c++. 
 
+# Resources
+
+Limine-c++-template: 
+https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
+
 # Todo
 
 1. get modules working

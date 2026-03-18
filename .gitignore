@@ -1,1 +1,5 @@
 /.vscode
+/build/
+/.cache/
+.clangd
+/dependencies/
