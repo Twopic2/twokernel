@@ -13,8 +13,8 @@ namespace CxxRuntime {
         void *__dso_handle;
     }
 
-    extern void (*__init_array[])();
-    extern void (*__init_array_end[])();
+    extern "C" void (*__init_array[])();
+    extern "C" void (*__init_array_end[])();
 
     void run_global_ctors() {
         for (std::size_t i = 0; &__init_array[i] != __init_array_end; i++) {

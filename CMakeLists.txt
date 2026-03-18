@@ -29,23 +29,17 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# ── Limine dependency ─────────────────────────────────────────────────────────
-# limine-src: source tag — provides limine.h and limine.c
-# limine-bin: binary tag — provides pre-built EFI/BIOS boot files
-# To update:
-#   git -C dependencies/limine-src fetch && git -C dependencies/limine-src checkout <tag>
-#   git -C dependencies/limine-bin fetch && git -C dependencies/limine-bin checkout <tag>-binary
-set(LIMINE_DIR     ${CMAKE_SOURCE_DIR}/dependencies/limine)
-set(LIMINE_SRC_DIR ${LIMINE_DIR})
+set(LIMINE_PROTO_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-proto)
+set(LIMINE_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-bin)
 set(LIMINE_BIN_DIR ${LIMINE_DIR})
 
-if(NOT EXISTS ${LIMINE_SRC_DIR}/limine.h)
+if(NOT EXISTS ${LIMINE_PROTO_DIR}/include/limine.h)
     message(FATAL_ERROR
         "limine.h not found. Run:\n"
-        "  git clone --depth 1 --branch v10.8.5 "
-        "https://github.com/limine-bootloader/limine.git dependencies/limine-src\n"
-        "  git clone --depth 1 --branch v10.8.5-binary "
-        "https://github.com/limine-bootloader/limine.git dependencies/limine-bin")
+        "  git clone --depth 1 "
+        "https://codeberg.org/Limine/limine-protocol.git dependencies/limine-proto\n"
+        "  git clone --depth 1 --branch v10.x-binary "
+        "https://codeberg.org/Limine/Limine.git dependencies/limine-bin")
 endif()
 
 # Re-configure when limine.h changes so compile_commands.json stays current.
@@ -107,7 +101,7 @@ target_compile_options(twokernel.elf PRIVATE -nostdinc++)
 add_custom_command(
     OUTPUT  ${CMAKE_BINARY_DIR}/limine
     COMMAND cc -g -O2 -pipe -std=c99 ${LIMINE_DIR}/limine.c -o ${CMAKE_BINARY_DIR}/limine
-    DEPENDS ${LIMINE_DIR}/limine.c ${LIMINE_DIR}/limine.h
+    DEPENDS ${LIMINE_DIR}/limine.c ${LIMINE_PROTO_DIR}/include/limine.h
     COMMENT "Building limine host tool"
 )
 add_custom_target(limine_host DEPENDS ${CMAKE_BINARY_DIR}/limine)

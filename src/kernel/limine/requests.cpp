@@ -1,7 +1,7 @@
 #include <limine/requests.hpp>
 #include <std/cstdint>
 
-#include <limine.h>
+#include "limits.h"
 
 namespace {
     __attribute__((used, section(".limine_requests")))
