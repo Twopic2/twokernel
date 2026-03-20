@@ -3,8 +3,11 @@
 
 #include <std/cstddef>
 
-namespace Interfaces {
-    void console_wirte(const char* buf, std::size_t len);
+#include <flanterm.h>
+#include <flanterm_backends/fb.h>
+
+namespace Limine {
+    extern struct flanterm_context* ft_ctx;
     void console_init();
 }
 

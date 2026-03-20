@@ -30,8 +30,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(LIMINE_PROTO_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-proto)
-set(LIMINE_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-bin)
-set(LIMINE_BIN_DIR ${LIMINE_DIR})
+set(LIMINE_BIN_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-bin)
+set(FLANTERM ${CMAKE_SOURCE_DIR}/dependencies/flanterm)
 
 if(NOT EXISTS ${LIMINE_PROTO_DIR}/include/limine.h)
     message(FATAL_ERROR
@@ -42,17 +42,22 @@ if(NOT EXISTS ${LIMINE_PROTO_DIR}/include/limine.h)
         "https://codeberg.org/Limine/Limine.git dependencies/limine-bin")
 endif()
 
+if(NOT EXISTS ${FLANTERM}/src/flanterm.h)
+    message(FATAL_ERROR
+        "flanterm not found. Run:\n"
+        "  git clone --depth 1 "
+        "https://codeberg.org/mintsuki/flanterm dependencies/flanterm")
+endif()
+
 # Re-configure when limine.h changes so compile_commands.json stays current.
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    ${LIMINE_SRC_DIR}/limine.h
+    ${LIMINE_PROTO_DIR}/include/limine.h
 )
 
 # ── Kernel compile flags ──────────────────────────────────────────────────────
-set(CMAKE_CXX_FLAGS "\
+set(CROSS_FLAGS "\
     -target x86_64-unknown-none-elf \
     -ffreestanding \
-    -fno-exceptions \
-    -fno-rtti \
     -fno-stack-protector \
     -fno-PIC \
     -mcmodel=kernel \
@@ -62,6 +67,8 @@ set(CMAKE_CXX_FLAGS "\
     -mno-sse2 \
     -Wall -Wextra \
 ")
+set(CMAKE_C_FLAGS   "${CROSS_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CROSS_FLAGS} -fno-exceptions -fno-rtti")
 
 set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/src/kernel/arch/x86-64/linker.lds)
 
@@ -75,21 +82,42 @@ set(LIBC_SOURCES
     src/libc/string.cpp
 )
 
-add_executable(twokernel.elf ${KERNEL_SOURCES} ${LIBC_SOURCES})
-
-target_link_options(twokernel.elf PRIVATE
-    -target x86_64-unknown-none-elf
-    -T ${LINKER_SCRIPT}
-    -nostdlib
-    -static
-    -fuse-ld=lld
-    -Wl,-z,max-page-size=0x1000
+set(FLANTERM_SOURCES
+    ${FLANTERM}/src/flanterm.c
+    ${FLANTERM}/src/flanterm_backends/fb.c
 )
+
+add_executable(twokernel.elf ${KERNEL_SOURCES} ${LIBC_SOURCES} ${FLANTERM_SOURCES})
+
+if(CMAKE_HOST_APPLE)
+    # Bypass clang++ for linking — it injects macOS SDK flags (-arch, -platform_version,
+    # -syslibroot) even with -target x86_64-unknown-none-elf, which confuses ld.lld.
+    # Invoking ld.lld directly avoids all host-platform contamination.
+    set(CMAKE_CXX_LINK_EXECUTABLE
+        "/opt/homebrew/bin/ld.lld <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>"
+    )
+    target_link_options(twokernel.elf PRIVATE
+        -T ${LINKER_SCRIPT}
+        -nostdlib
+        -static
+        -z max-page-size=0x1000
+    )
+else()
+    target_link_options(twokernel.elf PRIVATE
+        -target x86_64-unknown-none-elf
+        -T ${LINKER_SCRIPT}
+        -nostdlib
+        -static
+        -fuse-ld=lld
+        -Wl,-z,max-page-size=0x1000
+    )
+endif()
 
 target_include_directories(twokernel.elf PRIVATE
     src/kernel
     src/include
-    ${LIMINE_SRC_DIR}
+    ${LIMINE_PROTO_DIR}/include
+    ${FLANTERM}/src
 )
 
 # Use -nostdinc++ so the host libc++ (which assumes a hosted OS) is never
@@ -100,8 +128,8 @@ target_compile_options(twokernel.elf PRIVATE -nostdinc++)
 # ── Limine host tool ──────────────────────────────────────────────────────────
 add_custom_command(
     OUTPUT  ${CMAKE_BINARY_DIR}/limine
-    COMMAND cc -g -O2 -pipe -std=c99 ${LIMINE_DIR}/limine.c -o ${CMAKE_BINARY_DIR}/limine
-    DEPENDS ${LIMINE_DIR}/limine.c ${LIMINE_PROTO_DIR}/include/limine.h
+    COMMAND cc -g -O2 -pipe -std=c99 ${LIMINE_BIN_DIR}/limine.c -o ${CMAKE_BINARY_DIR}/limine
+    DEPENDS ${LIMINE_BIN_DIR}/limine.c ${LIMINE_PROTO_DIR}/include/limine.h
     COMMENT "Building limine host tool"
 )
 add_custom_target(limine_host DEPENDS ${CMAKE_BINARY_DIR}/limine)

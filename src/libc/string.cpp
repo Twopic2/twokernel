@@ -23,6 +23,35 @@ namespace LibC {
             }
 
             return s;
+        }   
+
+        void* memove(void* dest, const void* src, std::size_t n) {
+            std::uint8_t* pdest = static_cast<std::uint8_t *>(dest);
+            const std::uint8_t* psrc = static_cast<const std::uint8_t *>(src);
+            
+            if (reinterpret_cast<std::uintptr_t>(src) > reinterpret_cast<std::uintptr_t>(dest)) {
+                for (std::size_t i = 0; i < n; i++) {
+                    pdest[i] = psrc[i];
+                }
+            } else if (reinterpret_cast<std::uintptr_t>(src) < reinterpret_cast<std::uintptr_t>(dest)) {
+                for (std::size_t i = n; i > 0; i--) {
+                    pdest[i-1] = psrc[i-1];
+                }
+            }
+            return pdest;
+        }
+
+        int memcmp(const void* s1, const void* s2, std::size_t n) {
+            const std::uint8_t *p1 = static_cast<const std::uint8_t *>(s1);
+            const std::uint8_t *p2 = static_cast<const std::uint8_t *>(s2);
+
+            for (std::size_t i = 0; i < n; i++) {
+                if (p1[i] != p2[i]) {
+                    return p1[i] < p2[i] ? -1 : 1;
+                }
+            }
+
+            return 0;
         }
     }
 }
