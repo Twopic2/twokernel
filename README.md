@@ -8,8 +8,9 @@ Limine-c++-template:
 https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
 
 # Todo
+1. Make sure to use flanterm for terminal emulator 
+2. get gdt/idt 
+3. alloacting memory 
 
-1. get modules working
-2. get vga terminal working and framebuffer 
-3. get gdt/idt 
-4. alloacting memory 
+## Optional
+get modules working

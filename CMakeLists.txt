@@ -18,7 +18,7 @@ else()
 endif()
 
 # Tell CMake this is a cross-compilation for a bare-metal x86_64 target.
-# "Generic" prevents CMake from applying any host OS platform flags.
+# "Generic" prevents CMake frm applying any host OS platform flags.
 # STATIC_LIBRARY skips the link step in compiler detection.
 set(CMAKE_SYSTEM_NAME             Generic)
 set(CMAKE_SYSTEM_PROCESSOR        x86_64)
@@ -31,7 +31,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(LIMINE_PROTO_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-proto)
 set(LIMINE_BIN_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-bin)
-set(FLANTERM ${CMAKE_SOURCE_DIR}/dependencies/flanterm)
 
 if(NOT EXISTS ${LIMINE_PROTO_DIR}/include/limine.h)
     message(FATAL_ERROR
@@ -40,13 +39,6 @@ if(NOT EXISTS ${LIMINE_PROTO_DIR}/include/limine.h)
         "https://codeberg.org/Limine/limine-protocol.git dependencies/limine-proto\n"
         "  git clone --depth 1 --branch v10.x-binary "
         "https://codeberg.org/Limine/Limine.git dependencies/limine-bin")
-endif()
-
-if(NOT EXISTS ${FLANTERM}/src/flanterm.h)
-    message(FATAL_ERROR
-        "flanterm not found. Run:\n"
-        "  git clone --depth 1 "
-        "https://codeberg.org/mintsuki/flanterm dependencies/flanterm")
 endif()
 
 # Re-configure when limine.h changes so compile_commands.json stays current.
@@ -76,18 +68,16 @@ set(KERNEL_SOURCES
     src/kmain.cpp
     src/kernel/boot/boot.cpp
     src/kernel/limine/requests.cpp
+    src/kernel/drivers/framebuffer.cpp
+    src/kernel/drivers/tty.cpp
+    src/kernel/util/kernel_logger.cpp
 )
 
 set(LIBC_SOURCES
     src/libc/string.cpp
 )
 
-set(FLANTERM_SOURCES
-    ${FLANTERM}/src/flanterm.c
-    ${FLANTERM}/src/flanterm_backends/fb.c
-)
-
-add_executable(twokernel.elf ${KERNEL_SOURCES} ${LIBC_SOURCES} ${FLANTERM_SOURCES})
+add_executable(twokernel.elf ${KERNEL_SOURCES} ${LIBC_SOURCES}) 
 
 if(CMAKE_HOST_APPLE)
     # Bypass clang++ for linking — it injects macOS SDK flags (-arch, -platform_version,
@@ -114,10 +104,10 @@ else()
 endif()
 
 target_include_directories(twokernel.elf PRIVATE
+    src
     src/kernel
     src/include
     ${LIMINE_PROTO_DIR}/include
-    ${FLANTERM}/src
 )
 
 # Use -nostdinc++ so the host libc++ (which assumes a hosted OS) is never

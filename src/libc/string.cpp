@@ -53,5 +53,18 @@ namespace LibC {
 
             return 0;
         }
+
+        int strlen(const char* str) {
+            if (!str) {
+                return 0;
+            }
+            int count = 0;
+
+            while (*str != '\0') {
+                ++count;
+            }
+            
+            return count;
+        }
     }
 }

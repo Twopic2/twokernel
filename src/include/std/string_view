@@ -1,0 +1,31 @@
+#pragma once
+
+#include <std/cstddef>
+
+namespace std {
+    class string_view {
+    public:
+        constexpr string_view() : m_data(nullptr), m_size(0) {}
+        constexpr string_view(const char* s, size_t len) : m_data(s), m_size(len) {}
+
+        constexpr string_view(const char* s) : m_data(s), m_size(0) {
+            if (s) {
+                while (s[m_size]) ++m_size;
+            }
+        }
+
+        constexpr const char* data() const { return m_data; }
+        constexpr size_t size() const { return m_size; }
+        constexpr size_t length() const { return m_size; }
+        constexpr bool empty() const { return m_size == 0; }
+
+        constexpr char operator[](size_t i) const { return m_data[i]; }
+
+        constexpr const char* begin() const { return m_data; }
+        constexpr const char* end() const { return m_data + m_size; }
+
+    private:
+        const char* m_data;
+        size_t m_size;
+    };
+}
