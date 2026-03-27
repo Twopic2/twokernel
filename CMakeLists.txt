@@ -31,6 +31,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(LIMINE_PROTO_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-proto)
 set(LIMINE_BIN_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-bin)
+set(FLANTERM_DIR ${CMAKE_SOURCE_DIR}/dependencies/flanterm)
 
 if(NOT EXISTS ${LIMINE_PROTO_DIR}/include/limine.h)
     message(FATAL_ERROR
@@ -73,11 +74,16 @@ set(KERNEL_SOURCES
     src/kernel/util/kernel_logger.cpp
 )
 
+set(FLANTERM_SOURCES
+    ${FLANTERM_DIR}/src/flanterm.c
+    ${FLANTERM_DIR}/src/flanterm_backends/fb.c
+)
+
 set(LIBC_SOURCES
     src/libc/string.cpp
 )
 
-add_executable(twokernel.elf ${KERNEL_SOURCES} ${LIBC_SOURCES}) 
+add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCES}) 
 
 if(CMAKE_HOST_APPLE)
     # Bypass clang++ for linking — it injects macOS SDK flags (-arch, -platform_version,
@@ -108,6 +114,7 @@ target_include_directories(twokernel.elf PRIVATE
     src/kernel
     src/include
     ${LIMINE_PROTO_DIR}/include
+    ${FLANTERM_DIR}/src
 )
 
 # Use -nostdinc++ so the host libc++ (which assumes a hosted OS) is never
