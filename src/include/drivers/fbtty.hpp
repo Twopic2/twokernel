@@ -1,9 +1,8 @@
 #pragma once
 
 #include <limine.h>
-#include <drivers/font_8x16.hpp>
 #include <drivers/framebuffer.hpp>
-#include <std/string_view>
+#include <include/std/cstddef>
 
 // Ansi color codes
 // https://gist.github.com/JBlond/2fea43a3049b38287e5e9cefc87b2124
@@ -31,33 +30,11 @@ namespace Drivers {
         uint8_t padding[17];
     };
 
-    class Tty : FrameBuffer {
-        private:
-            struct FontPixelSize {
-                uint8_t col;
-                uint8_t row;
-            };
-
-            static constexpr FontPixelSize default_size { 8, 16 };
-
-            ColorRGB m_fg { 0xAA, 0xAA, 0xAA }; // light gray
-            ColorRGB m_bg { 0x00, 0x00, 0x00 }; // black
-
-            std::uint64_t m_cursor_x = 0;
-            std::uint64_t m_cursor_y = 0;
-            std::uint64_t m_cols;
-            std::uint64_t m_rows;
-
-            void draw_char(char c, ColorRGB& fg, ColorRGB& bg);
-            /// TODO: make sure to add a circular buffer(deque) for keyword presses and line lookup
-            // 4096 for both read/write
-            
+    class FbTty : public FrameBuffer {
         public:
-            Tty(struct limine_framebuffer* fb);
-   
-            void write_terminal(std::string_view str);
+            FbTty(struct limine_framebuffer* fb);
 
+            void write_terminal(const char* str, std::size_t len);
             void putchar(char c);
-            void newline();
     };
 }

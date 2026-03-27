@@ -70,7 +70,7 @@ set(KERNEL_SOURCES
     src/kernel/boot/boot.cpp
     src/kernel/limine/requests.cpp
     src/kernel/drivers/framebuffer.cpp
-    src/kernel/drivers/tty.cpp
+    src/kernel/drivers/fbtty.cpp
     src/kernel/util/kernel_logger.cpp
 )
 

@@ -2,6 +2,8 @@
 #include <include/libc/string.hpp>
 
 namespace Util {
+    char char_buff[4096];
+
     int vsnprintf(char* buf, const char* fmt, va_list args) {
         char* str = buf;
 
@@ -55,7 +57,7 @@ namespace Util {
         va_list args;
         va_start(args, fmt);
 
-        int len = vsnprintf(char_buff.data(), fmt, args);
+        int len = vsnprintf(char_buff, fmt, args);
 
         va_end(args);
 
