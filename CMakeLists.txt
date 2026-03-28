@@ -32,6 +32,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(LIMINE_PROTO_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-proto)
 set(LIMINE_BIN_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-bin)
 set(FLANTERM_DIR ${CMAKE_SOURCE_DIR}/dependencies/flanterm)
+set(FREESTND_CXX_DIR ${CMAKE_SOURCE_DIR}/dependencies/freestnd-cxx-hdrs)
 
 if(NOT EXISTS ${LIMINE_PROTO_DIR}/include/limine.h)
     message(FATAL_ERROR
@@ -40,6 +41,13 @@ if(NOT EXISTS ${LIMINE_PROTO_DIR}/include/limine.h)
         "https://codeberg.org/Limine/limine-protocol.git dependencies/limine-proto\n"
         "  git clone --depth 1 --branch v10.x-binary "
         "https://codeberg.org/Limine/Limine.git dependencies/limine-bin")
+endif()
+
+if(NOT EXISTS ${FREESTND_CXX_DIR}/x86_64/include)
+    message(FATAL_ERROR
+        "freestnd-cxx-hdrs not found. Run:\n"
+        "  git clone --depth 1 "
+        "https://github.com/osdev0/freestnd-cxx-hdrs.git dependencies/freestnd-cxx-hdrs")
 endif()
 
 # Re-configure when limine.h changes so compile_commands.json stays current.
@@ -113,13 +121,17 @@ target_include_directories(twokernel.elf PRIVATE
     src
     src/kernel
     src/include
+    src/include/std
     ${LIMINE_PROTO_DIR}/include
     ${FLANTERM_DIR}/src
 )
 
+target_include_directories(twokernel.elf SYSTEM PRIVATE
+    ${FREESTND_CXX_DIR}/x86_64/include
+)
+
 # Use -nostdinc++ so the host libc++ (which assumes a hosted OS) is never
-# pulled in. Our src/include/cstdint and src/include/cstddef wrappers
-# forward to the compiler's built-in freestanding <stdint.h> / <stddef.h>.
+# pulled in. Freestanding C++ headers are provided by freestnd-cxx-hdrs.
 target_compile_options(twokernel.elf PRIVATE -nostdinc++)
 
 # ── Limine host tool ──────────────────────────────────────────────────────────

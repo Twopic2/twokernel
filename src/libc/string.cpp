@@ -1,6 +1,6 @@
 #include <libc/string.hpp>
 
-#include <std/cstdint>
+#include <cstdint>
 
 namespace LibC {
     extern "C" {

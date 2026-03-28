@@ -1,6 +1,10 @@
 #pragma once
-#include <stddef.h>
 
-namespace std {
-    using ::size_t;
+#include_next <cstddef>
+
+using ssize_t = __PTRDIFF_TYPE__;
+
+namespace std
+{
+    using ::ssize_t;
 } 

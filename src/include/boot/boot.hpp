@@ -1,6 +1,6 @@
 #pragma once
 
-#include <std/cstddef>
+#include <cstddef>
 
 namespace CxxRuntime {
     [[noreturn]] void hcf();

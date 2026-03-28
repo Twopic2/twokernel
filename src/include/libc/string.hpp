@@ -1,7 +1,7 @@
 #ifndef __LIBC__STRING_HPP
 #define __LIBC__STRING_HPP
 
-#include <std/cstddef>
+#include <cstddef>
 
 // Credit to mint's memory.hpp template repo
 namespace LibC {

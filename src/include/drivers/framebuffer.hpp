@@ -1,8 +1,8 @@
 #pragma once
 
 #include <limine.h>
-#include <std/cstddef>
-#include <std/cstdint>
+#include <cstddef>
+#include <cstdint>
 
 extern "C" {
     #include <flanterm.h>

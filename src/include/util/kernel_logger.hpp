@@ -1,7 +1,7 @@
 #pragma once
 
 #include <libc/string.hpp>
-#include <include/std/cstdarg>
+#include <cstdarg>
 
 namespace Util {
     extern char char_buff[4096];

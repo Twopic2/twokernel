@@ -1,5 +1,6 @@
 #pragma once
-#include <stdint.h>
+
+#include_next <cstdint>
 
 namespace std {
     using ::int8_t;

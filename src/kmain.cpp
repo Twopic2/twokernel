@@ -4,7 +4,7 @@
 #include <include/drivers/fbtty.hpp>
 #include <include/drivers/framebuffer.hpp>
 
-#include <std/cstdint>
+#include <cstdint>
 
 extern "C" {
 #include <flanterm.h>
