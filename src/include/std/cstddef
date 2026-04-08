@@ -1,10 +1,14 @@
 #pragma once
 
-#include_next <cstddef>
+#ifdef TWOKERNEL_HOST_MACOS
+#  include <stddef.h>
+#else
+#  include_next <cstddef>
+#endif
 
 using ssize_t = __PTRDIFF_TYPE__;
 
-namespace std
-{
-    using ::ssize_t;
-} 
+namespace std {
+    using ::size_t;
+    using nullptr_t = decltype(nullptr);
+}

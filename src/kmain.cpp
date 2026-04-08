@@ -1,10 +1,8 @@
 #include <boot/boot.hpp>
 #include <limine/requests.hpp>
-#include <include/util/kernel_logger.hpp>
-#include <include/drivers/fbtty.hpp>
-#include <include/drivers/framebuffer.hpp>
-
-#include <cstdint>
+#include <util/kernel_logger.hpp>
+#include <drivers/fbtty.hpp>
+#include <drivers/framebuffer.hpp>
 
 extern "C" {
 #include <flanterm.h>

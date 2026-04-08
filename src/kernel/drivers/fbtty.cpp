@@ -1,4 +1,4 @@
-#include <include/drivers/fbtty.hpp>
+#include <drivers/fbtty.hpp>
 
 namespace Drivers {
     FbTty::FbTty(struct limine_framebuffer* fb) : FrameBuffer(fb) {}

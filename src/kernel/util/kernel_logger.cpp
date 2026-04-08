@@ -1,5 +1,5 @@
-#include <include/util/kernel_logger.hpp>
-#include <include/libc/string.hpp>
+#include <util/kernel_logger.hpp>
+#include <libc/string.hpp>
 
 namespace Util {
     char char_buff[4096];

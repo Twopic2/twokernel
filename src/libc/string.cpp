@@ -19,7 +19,7 @@ namespace LibC {
             std::uint8_t *p = reinterpret_cast<std::uint8_t *>(s);
 
             for (std::size_t i = 0; i < n; i++) {
-                p[i] = static_cast<uint8_t>(c);
+                p[i] = static_cast<std::uint8_t>(c);
             }
 
             return s;

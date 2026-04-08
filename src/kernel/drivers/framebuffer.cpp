@@ -1,4 +1,4 @@
-#include <include/drivers/framebuffer.hpp>
+#include <drivers/framebuffer.hpp>
 
 namespace Drivers {
     FrameBuffer::FrameBuffer(struct limine_framebuffer* fb)

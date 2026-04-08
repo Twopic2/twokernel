@@ -1,6 +1,10 @@
 #pragma once
 
-#include_next <cstdint>
+#ifdef TWOKERNEL_HOST_MACOS
+#  include <stdint.h>
+#else
+#  include_next <cstdint>
+#endif
 
 namespace std {
     using ::int8_t;
@@ -13,4 +17,4 @@ namespace std {
     using ::uint64_t;
     using ::intptr_t;
     using ::uintptr_t;
-} 
+}

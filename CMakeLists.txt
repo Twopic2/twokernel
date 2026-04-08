@@ -33,6 +33,7 @@ set(LIMINE_PROTO_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-proto)
 set(LIMINE_BIN_DIR ${CMAKE_SOURCE_DIR}/dependencies/limine-bin)
 set(FLANTERM_DIR ${CMAKE_SOURCE_DIR}/dependencies/flanterm)
 set(FREESTND_CXX_DIR ${CMAKE_SOURCE_DIR}/dependencies/freestnd-cxx-hdrs)
+set(FREESTND_C_DIR   ${CMAKE_SOURCE_DIR}/dependencies/freestnd-c-hdrs)
 
 if(NOT EXISTS ${LIMINE_PROTO_DIR}/include/limine.h)
     message(FATAL_ERROR
@@ -48,6 +49,13 @@ if(NOT EXISTS ${FREESTND_CXX_DIR}/x86_64/include)
         "freestnd-cxx-hdrs not found. Run:\n"
         "  git clone --depth 1 "
         "https://github.com/osdev0/freestnd-cxx-hdrs.git dependencies/freestnd-cxx-hdrs")
+endif()
+
+if(NOT EXISTS ${FREESTND_C_DIR}/x86_64/include)
+    message(FATAL_ERROR
+        "freestnd-c-hdrs not found. Run:\n"
+        "  git clone --depth 1 "
+        "https://github.com/osdev0/freestnd-c-hdrs.git dependencies/freestnd-c-hdrs")
 endif()
 
 # Re-configure when limine.h changes so compile_commands.json stays current.
@@ -91,7 +99,11 @@ set(LIBC_SOURCES
     src/libc/string.cpp
 )
 
-add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCES}) 
+add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCES})
+
+if(CMAKE_HOST_APPLE)
+    target_compile_definitions(twokernel.elf PRIVATE TWOKERNEL_HOST_MACOS)
+endif()
 
 if(CMAKE_HOST_APPLE)
     # Bypass clang++ for linking — it injects macOS SDK flags (-arch, -platform_version,
@@ -128,6 +140,7 @@ target_include_directories(twokernel.elf PRIVATE
 
 target_include_directories(twokernel.elf SYSTEM PRIVATE
     ${FREESTND_CXX_DIR}/x86_64/include
+    ${FREESTND_C_DIR}/x86_64/include
 )
 
 # Use -nostdinc++ so the host libc++ (which assumes a hosted OS) is never

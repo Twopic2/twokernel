@@ -1,6 +1,11 @@
 #pragma once
 
-#include_next <cstdarg>
+#ifdef TWOKERNEL_HOST_MACOS
+#  include <stdarg.h>
+#else
+
+#  include_next <cstdarg>
+#endif
 
 namespace std {
     using ::va_list;
