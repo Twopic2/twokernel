@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
 
-# ── Compiler selection (must be before project()) ─────────────────────────────
 # Apple's clang injects -arch and -isysroot which break bare-metal cross-compilation.
 # On macOS we require homebrew LLVM; on Linux clang is upstream and works as-is.
 if(CMAKE_HOST_APPLE)
@@ -88,6 +87,10 @@ set(KERNEL_SOURCES
     src/kernel/drivers/framebuffer.cpp
     src/kernel/drivers/fbtty.cpp
     src/kernel/util/kernel_logger.cpp
+    src/kernel/arch/x86-64/system/gdt.cpp
+    src/kernel/arch/x86-64/system/gdt.s
+    src/kernel/arch/x86-64/system/idt.cpp
+    src/kernel/arch/x86-64/system/isr.s
 )
 
 set(FLANTERM_SOURCES
@@ -133,7 +136,6 @@ target_include_directories(twokernel.elf PRIVATE
     src
     src/kernel
     src/include
-    src/include/std
     ${LIMINE_PROTO_DIR}/include
     ${FLANTERM_DIR}/src
 )
