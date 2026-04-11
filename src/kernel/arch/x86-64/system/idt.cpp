@@ -1,5 +1,5 @@
 #include "arch/x86-64/system/idt.hpp"
-#include <cstdint>
+#include<cstdint>
 
 /* 
 IRQ Mapping
@@ -35,7 +35,7 @@ namespace x86::System::Idt {
     void set_idt_entries(std::uint8_t index, void* handler, std::uint8_t ist, std::uint8_t dpl) {
         auto address = reinterpret_cast<std::uintptr_t>(handler);
 
-        auto& entry = idt_table.at(index);
+        auto& entry = idt_table[index];
 
         entry.offset0 = address;
         entry.offset1 = static_cast<std::uint16_t>(address >> 16);

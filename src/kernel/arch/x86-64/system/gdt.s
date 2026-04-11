@@ -1,6 +1,7 @@
-global gdt_flush
+.intel_syntax noprefix
+.globl gdt_flush
 gdt_flush:
-    lgdt [rdi]          
+    lgdt [rdi]
 
     mov ax, 0x28
     ltr ax
@@ -12,10 +13,10 @@ gdt_flush:
     mov gs, ax
     mov ss, ax
 
-    push qword 0x08
-    lea rax, [rel .reload_cs]
+    push 0x08
+    lea rax, [rip + .reload_cs]
     push rax
-    retfq               
+    retfq
 
 .reload_cs:
     ret
