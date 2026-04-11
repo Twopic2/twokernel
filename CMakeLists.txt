@@ -23,7 +23,7 @@ set(CMAKE_SYSTEM_NAME             Generic)
 set(CMAKE_SYSTEM_PROCESSOR        x86_64)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 
-project(twokernel LANGUAGES C CXX)
+project(twokernel LANGUAGES C CXX ASM)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -147,7 +147,14 @@ target_include_directories(twokernel.elf SYSTEM PRIVATE
 
 # Use -nostdinc++ so the host libc++ (which assumes a hosted OS) is never
 # pulled in. Freestanding C++ headers are provided by freestnd-cxx-hdrs.
-target_compile_options(twokernel.elf PRIVATE -nostdinc++)
+target_compile_options(twokernel.elf PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
+
+# Suppress warnings-as-errors for flags that don't apply to the assembler.
+set_source_files_properties(
+    src/kernel/arch/x86-64/system/gdt.s
+    src/kernel/arch/x86-64/system/isr.s
+    PROPERTIES COMPILE_OPTIONS "-Wno-unused-command-line-argument"
+)
 
 # ── Limine host tool ──────────────────────────────────────────────────────────
 add_custom_command(
