@@ -1,5 +1,6 @@
 #pragma once
 
+#include <arch/x86-64/arch/arch_irq.hpp>
 #include <std/array>
 #include <std/string_view>
 #include <std/cstdint>
@@ -23,12 +24,13 @@ namespace x86::System::Idt {
         std::uint32_t resered;
     };
 
-    extern void* irq_stubs[];
+    extern "C" void* irq_stubs[];
 
     // GDT code segment
     constexpr std::uint8_t code = 0x08;
     constexpr std::size_t int_vector {256};
-    
+   
+    /// REMEBER: there's a reference pointing towards the index 
     inline std::array<IdtEntry, int_vector> idt_table;
 
     void set_idt_entries(std::uint8_t index, void* handler, std::uint8_t ist, std::uint8_t dpl);

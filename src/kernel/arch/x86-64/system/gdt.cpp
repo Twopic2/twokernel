@@ -1,3 +1,4 @@
+#include "util/kernel_logger.hpp"
 #include <arch/x86-64/system/gdt.hpp>
 
 namespace x86::System::Gdt {
@@ -40,6 +41,8 @@ namespace x86::System::Gdt {
         const auto* seg = reinterpret_cast<std::uint64_t*>(&desc);
         gdt_entries[5] = seg[0];
         gdt_entries[6] = seg[1];
+
+        Util::klog("init: gdt\n");
     }
 
     extern "C" void gdt_flush(void *);

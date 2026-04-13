@@ -1,5 +1,6 @@
 #include <util/kernel_logger.hpp>
 #include <libc/string.hpp>
+#include <drivers/fbtty.hpp>
 
 namespace Util {
     char char_buff[4096];
@@ -53,6 +54,7 @@ namespace Util {
         return static_cast<int>(str - buf);
     }
 
+    // Old version
     int printk(const char* fmt, ...) {
         va_list args;
         va_start(args, fmt);
@@ -64,4 +66,14 @@ namespace Util {
         return len;
     }
 
+    void klog(const char* fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+
+        int len = vsnprintf(char_buff, fmt, args);
+        
+        va_end(args);
+        
+        Drivers::g_tty->write_terminal(char_buff, len);
+    }
 }

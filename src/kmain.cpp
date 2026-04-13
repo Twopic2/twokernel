@@ -24,9 +24,9 @@ extern "C" void kmain() {
     
     Drivers::FbTty fbtty(framebuffer);
     fbtty.fb_init();
+    Drivers::g_tty = &fbtty;
 
-    int len = Util::printk("Hello world kernel\n");
-    fbtty.write_terminal(Util::char_buff, len);
+    Util::klog("Started Kernel\n");
 
     // Once we finish we halt
     CxxRuntime::hcf();

@@ -8,4 +8,5 @@ namespace Util {
 
     int printk(const char* fmt, ...);
     int vsnprintf(char *buf, const char *fmt, va_list args);
+    void klog(const char* fmt, ...);
 }

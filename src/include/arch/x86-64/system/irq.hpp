@@ -2,5 +2,43 @@
 
 #include <arch/x86-64/arch/arch_irq.hpp>
 #include <cstdint>
+#include <std/cstdint>
+#include <std/array>
 
-void register_irq_handler(std::uint8_t n, IrqFrame& handler);
+/// TODO: Should change the Pic to Apicx2
+/// CREDIT: https://wiki.osdev.org/8259_PIC
+/// Big thanks to the osdev wiki for helping me set up the 8259 Pic. 
+///  "The function of the 8259A is to manage hardware interrupts and send them to 
+/// the appropriate system interrupt.This allows the system to respond to devices needs  
+///  without loss of time (from polling the device, for instance)."
+
+namespace x86::System::Irq {
+    namespace Pic {
+        constexpr std::uint16_t MASTER_CMD  = 0x20;
+        constexpr std::uint16_t MASTER_DATA = 0x21;
+        constexpr std::uint16_t SLAVE_CMD   = 0xA0;
+        constexpr std::uint16_t SLAVE_DATA  = 0xA1;
+
+        constexpr std::uint8_t ICW1_INIT = 0x10;
+        constexpr std::uint8_t ICW1_ICW4 = 0x01;
+
+        constexpr std::uint8_t ICW3_MASTER = 0x04;  
+        constexpr std::uint8_t ICW3_SLAVE  = 0x02;  
+
+        constexpr std::uint8_t ICW4_8086 = 0x01;
+
+        constexpr std::uint8_t EOI = 0x20;
+    }
+    
+    using IrqHandler = void(*)(ArchIrq::IrqFrame*, std::uint32_t);
+
+    inline std::array<IrqHandler, 256> irq_handlers {};
+
+    void eoi(std::uint8_t vector);
+    void pic_remap(std::uint8_t master_offset, std::uint8_t slave_offset);
+    void pic_disable();
+    void irq_mask(std::uint8_t irq_line);
+    void irq_unmask(std::uint8_t irq_line);
+
+    void register_exception_handler(std::uint8_t n, IrqHandler handler);
+}
