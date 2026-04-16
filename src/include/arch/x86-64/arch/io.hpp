@@ -12,8 +12,4 @@ namespace x86::IO {
         asm volatile("inb %1, %0" : "=a"(val) : "Nd"(port));
         return val;
     }
-
-    inline void io_wait() {
-        outb(0x80, 0);
-    }
 }

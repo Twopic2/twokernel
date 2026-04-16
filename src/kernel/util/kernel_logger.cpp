@@ -10,6 +10,9 @@ namespace Util {
 
         for (; *fmt; fmt++) {
             if (*fmt != '%') {
+                if (*fmt == '\n') {
+                    *str++ = '\r';
+                }
                 *str++ = *fmt;
                 continue;
             }
@@ -31,6 +34,43 @@ namespace Util {
                         ++str;
                     }
 
+                    break;
+                }
+
+                case 'u': {
+                    unsigned int val = va_arg(args, unsigned int);
+                    char tmp[20];
+                    int i = 0;
+                    if (val == 0) {
+                        tmp[i++] = '0';
+                    } else {
+                        while (val > 0) {
+                            tmp[i++] = '0' + (val % 10);
+                            val /= 10;
+                        }
+                    }
+                    while (i > 0) {
+                        *str++ = tmp[--i];
+                    }
+                    break;
+                }
+
+                case 'x': {
+                    unsigned int val = va_arg(args, unsigned int);
+                    char tmp[16];
+                    int i = 0;
+                    if (val == 0) {
+                        tmp[i++] = '0';
+                    } else {
+                        while (val > 0) {
+                            int nibble = val & 0xF;
+                            tmp[i++] = nibble < 10 ? '0' + nibble : 'a' + nibble - 10;
+                            val >>= 4;
+                        }
+                    }
+                    while (i > 0) {
+                        *str++ = tmp[--i];
+                    }
                     break;
                 }
 

@@ -11,7 +11,7 @@ extern "C" {
 
 namespace Drivers {
     class FrameBuffer {
-    protected:
+    public:
         struct limine_framebuffer* m_fb {};
         struct flanterm_context* ft_ctx {};
 

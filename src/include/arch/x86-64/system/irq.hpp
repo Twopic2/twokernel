@@ -19,8 +19,7 @@ namespace x86::System::Irq {
         constexpr std::uint16_t SLAVE_CMD   = 0xA0;
         constexpr std::uint16_t SLAVE_DATA  = 0xA1;
 
-        constexpr std::uint8_t ICW1_INIT = 0x10;
-        constexpr std::uint8_t ICW1_ICW4 = 0x01;
+        constexpr std::uint8_t BEGIN_INIT = 0x11;
 
         constexpr std::uint8_t ICW3_MASTER = 0x04;  
         constexpr std::uint8_t ICW3_SLAVE  = 0x02;  
@@ -28,6 +27,9 @@ namespace x86::System::Irq {
         constexpr std::uint8_t ICW4_8086 = 0x01;
 
         constexpr std::uint8_t EOI = 0x20;
+
+        constexpr std::uint8_t IRQ_MASTER = 0x20;
+        constexpr std::uint8_t IRQ_SLAVE = 0x28;
     }
     
     using IrqHandler = void(*)(ArchIrq::IrqFrame*, std::uint32_t);
@@ -35,7 +37,7 @@ namespace x86::System::Irq {
     inline std::array<IrqHandler, 256> irq_handlers {};
 
     void eoi(std::uint8_t vector);
-    void pic_remap(std::uint8_t master_offset, std::uint8_t slave_offset);
+    void pic_remap();
     void pic_disable();
     void irq_mask(std::uint8_t irq_line);
     void irq_unmask(std::uint8_t irq_line);

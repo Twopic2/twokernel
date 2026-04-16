@@ -3,6 +3,7 @@
 #include <util/kernel_logger.hpp>
 #include <drivers/fbtty.hpp>
 #include <drivers/framebuffer.hpp>
+#include <arch/x86-64/arch.hpp>
 
 extern "C" {
 #include <flanterm.h>
@@ -27,6 +28,12 @@ extern "C" void kmain() {
     Drivers::g_tty = &fbtty;
 
     Util::klog("Started Kernel\n");
+
+    auto first_init = x86::inital_init();
+    
+    if (first_init) {
+        x86::exception_load();
+    }
 
     // Once we finish we halt
     CxxRuntime::hcf();

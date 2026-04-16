@@ -35,7 +35,6 @@ namespace Drivers {
             FbTty(struct limine_framebuffer* fb);
 
             void write_terminal(const char* str, std::size_t len);
-            void putchar(char c);
     };
 
     extern FbTty* g_tty;

@@ -42,7 +42,7 @@ namespace x86::System::Gdt {
         gdt_entries[5] = seg[0];
         gdt_entries[6] = seg[1];
 
-        Util::klog("init: gdt\n");
+        Util::klog("gdt: entries initialized\n");
     }
 
     extern "C" void gdt_flush(void *);
@@ -54,5 +54,6 @@ namespace x86::System::Gdt {
         };
 
         gdt_flush(&gdtr);
+        Util::klog("gdt: loaded successfully\n");
     }
 }

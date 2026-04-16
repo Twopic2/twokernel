@@ -10,8 +10,4 @@ namespace Drivers {
             flanterm_write(ft_ctx, str, len);
         }
     }
-
-    void FbTty::putchar(char c) {
-        write_terminal(&c, 1);
-    }
 }

@@ -77,6 +77,7 @@ set(CROSS_FLAGS "\
 ")
 set(CMAKE_C_FLAGS   "${CROSS_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CROSS_FLAGS} -fno-exceptions -fno-rtti")
+set(CMAKE_ASM_FLAGS "${CROSS_FLAGS}")
 
 set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/src/kernel/arch/x86-64/linker.lds)
 
@@ -87,9 +88,12 @@ set(KERNEL_SOURCES
     src/kernel/drivers/framebuffer.cpp
     src/kernel/drivers/fbtty.cpp
     src/kernel/util/kernel_logger.cpp
+    src/kernel/arch/x86-64/arch.cpp
     src/kernel/arch/x86-64/system/gdt.cpp
     src/kernel/arch/x86-64/system/gdt.s
     src/kernel/arch/x86-64/system/idt.cpp
+    src/kernel/arch/x86-64/system/irq.cpp
+    src/kernel/arch/x86-64/system/exceptions.cpp
     src/kernel/arch/x86-64/system/isr.s
 )
 
