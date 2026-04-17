@@ -62,6 +62,7 @@ namespace LibC {
 
             while (*str != '\0') {
                 ++count;
+                str += 1;
             }
             
             return count;
