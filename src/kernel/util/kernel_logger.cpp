@@ -3,7 +3,6 @@
 #include <drivers/fbtty.hpp>
 
 namespace Util {
-    char char_buff[4096];
 
     int vsnprintf(char* buf, const char* fmt, va_list args) {
         char* str = buf;
@@ -21,19 +20,10 @@ namespace Util {
             switch (*fmt) {
                 case 's': {
                     auto s = va_arg(args, char *);
-
-                    if (!s) {
-                        break;
+                    if (!s) break;
+                    while (*s) {
+                        *str++ = *s++;
                     }
-
-                    auto len = LibC::strlen(s);
-                    
-                    for (int i = 0; i < len; i++) {
-                        *str = *s;
-                        ++s;
-                        ++str;
-                    }
-
                     break;
                 }
 
@@ -94,26 +84,12 @@ namespace Util {
         return static_cast<int>(str - buf);
     }
 
-    // Old version
-    int printk(const char* fmt, ...) {
-        va_list args;
-        va_start(args, fmt);
-
-        int len = vsnprintf(char_buff, fmt, args);
-
-        va_end(args);
-
-        return len;
-    }
-
     void klog(const char* fmt, ...) {
+        char buf[1024];
         va_list args;
         va_start(args, fmt);
-
-        int len = vsnprintf(char_buff, fmt, args);
-        
+        int len = vsnprintf(buf, fmt, args);
         va_end(args);
-        
-        Drivers::g_tty->write_terminal(char_buff, len);
+        Drivers::g_tty->write_terminal(buf, len);
     }
 }
