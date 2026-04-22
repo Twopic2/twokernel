@@ -1,3 +1,4 @@
+#include "memory/pmm.hpp"
 #include <boot/boot.hpp>
 #include <limine/requests.hpp>
 #include <util/kernel_logger.hpp>
@@ -34,6 +35,8 @@ extern "C" void kmain() {
     if (first_init) {
         x86::exception_load();
     }
+
+    Memory::Pmm::init_pmm();
 
     // Once we finish we halt
     CxxRuntime::hcf();

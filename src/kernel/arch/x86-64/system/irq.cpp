@@ -84,7 +84,7 @@ namespace x86::System::Irq {
 
     extern "C" [[gnu::used]] void arch_interrupt_handler(ArchIrq::IrqFrame* frame, std::uint32_t vector) {
         if (auto h = irq_handlers[vector]) {
-            h(frame, vector);
+            h(frame);
         } else {
             Util::klog("unhandled CPU exception\n");
             for (;;) __asm__ volatile ("cli; hlt");

@@ -32,7 +32,7 @@ namespace x86::System::Irq {
         constexpr std::uint8_t IRQ_SLAVE = 0x28;
     }
     
-    using IrqHandler = void(*)(ArchIrq::IrqFrame*, std::uint32_t);
+    using IrqHandler = void(*)(ArchIrq::IrqFrame*);
 
     inline std::array<IrqHandler, 256> irq_handlers {};
 

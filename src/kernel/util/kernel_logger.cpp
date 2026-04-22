@@ -64,6 +64,41 @@ namespace Util {
                     break;
                 }
 
+                case 'l': {
+                    if (fmt[1] == 'l') {
+                        fmt += 2;
+                        if (*fmt == 'x') {
+                            unsigned long long val = va_arg(args, unsigned long long);
+                            char tmp[16];
+                            int i = 0;
+                            if (val == 0) {
+                                tmp[i++] = '0';
+                            } else {
+                                while (val > 0) {
+                                    int nibble = val & 0xF;
+                                    tmp[i++] = nibble < 10 ? '0' + nibble : 'a' + nibble - 10;
+                                    val >>= 4;
+                                }
+                            }
+                            while (i > 0) *str++ = tmp[--i];
+                        } else if (*fmt == 'u') {
+                            unsigned long long val = va_arg(args, unsigned long long);
+                            char tmp[20];
+                            int i = 0;
+                            if (val == 0) {
+                                tmp[i++] = '0';
+                            } else {
+                                while (val > 0) {
+                                    tmp[i++] = '0' + (val % 10);
+                                    val /= 10;
+                                }
+                            }
+                            while (i > 0) *str++ = tmp[--i];
+                        }
+                    }
+                    break;
+                }
+
                 case '%':
                     *str++ = '%';
                     break;

@@ -4,28 +4,28 @@
 #include <std/cstdint>
 
 namespace x86::System::Idt {
-    void x86_div_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_debug_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_nmi_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_breakpoint_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_overflow_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_bound_range_exceeded_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_invalid_op_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_device_not_available_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_double_fault_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_coproc_seg_overrun_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_invalid_tss_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_seg_not_present_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_stack_seg_fault_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_gp_fault_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_pagefault_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_x87_floating_point_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_alignment_check_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_machine_check_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_simd_exception_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_virt_exception_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_control_protection_exception_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_hypervisor_injection_exception_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_vmm_comm_exception_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
-    void x86_security_exception_handler(ArchIrq::IrqFrame* frame, std::uint32_t vec);
+    void x86_div_handler(ArchIrq::IrqFrame* frame);
+    void x86_debug_handler(ArchIrq::IrqFrame* frame);
+    void x86_nmi_handler(ArchIrq::IrqFrame* frame);
+    void x86_breakpoint_handler(ArchIrq::IrqFrame* frame);
+    void x86_overflow_handler(ArchIrq::IrqFrame* frame);
+    void x86_bound_range_exceeded_handler(ArchIrq::IrqFrame* frame);
+    void x86_invalid_op_handler(ArchIrq::IrqFrame* frame);
+    void x86_device_not_available_handler(ArchIrq::IrqFrame* frame);
+    void x86_double_fault_handler(ArchIrq::IrqFrame* frame);
+    void x86_coproc_seg_overrun_handler(ArchIrq::IrqFrame* frame);
+    void x86_invalid_tss_handler(ArchIrq::IrqFrame* frame);
+    void x86_seg_not_present_handler(ArchIrq::IrqFrame* frame);
+    void x86_stack_seg_fault_handler(ArchIrq::IrqFrame* frame);
+    void x86_gp_fault_handler(ArchIrq::IrqFrame* frame);
+    void x86_pagefault_handler(ArchIrq::IrqFrame* frame);
+    void x86_x87_floating_point_handler(ArchIrq::IrqFrame* frame);
+    void x86_alignment_check_handler(ArchIrq::IrqFrame* frame);
+    void x86_machine_check_handler(ArchIrq::IrqFrame* frame);
+    void x86_simd_exception_handler(ArchIrq::IrqFrame* frame);
+    void x86_virt_exception_handler(ArchIrq::IrqFrame* frame);
+    void x86_control_protection_exception_handler(ArchIrq::IrqFrame* frame);
+    void x86_hypervisor_injection_exception_handler(ArchIrq::IrqFrame* frame);
+    void x86_vmm_comm_exception_handler(ArchIrq::IrqFrame* frame);
+    void x86_security_exception_handler(ArchIrq::IrqFrame* frame);
 }
