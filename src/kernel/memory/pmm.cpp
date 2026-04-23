@@ -8,14 +8,12 @@
 namespace Memory::Pmm {
     FreeList* freelist_head = nullptr;
 
-    void* alloc(std::size_t count) {
+    std::uintptr_t alloc(std::size_t count) {
         FreeList* prev = nullptr;
         FreeList* curr = freelist_head;
 
         while (curr) {
             if (curr->num_pages >= count) {
-                std::uint64_t phys = reinterpret_cast<std::uint64_t>(curr) - get_hhdm();
-
                 if (prev) {
                     prev->next = curr->next;
                 } else {
@@ -23,19 +21,20 @@ namespace Memory::Pmm {
                 }
 
                 if (curr->num_pages > count) {
-                    std::uint64_t phys_offset = phys + count * page_size;
+                    std::uint64_t phys_offset = curr->pa + count * page_size;
                     std::uint64_t page_offset = curr->num_pages - count;
                     
                     push_list(phys_offset, page_offset);
                 }
 
-                return reinterpret_cast<void*>(phys);
+                return curr->pa;
             }
+
             prev = curr;
             curr = curr->next;
         }
 
-        return nullptr;
+        return 0;
     }
 
     void free(void* phys_mem, std::uint64_t count) {
@@ -52,8 +51,8 @@ namespace Memory::Pmm {
             if (entry->type == LIMINE_MEMMAP_USABLE) {
                 // entry->base would be starting physical address
                 // entry->length: size of memory    
-                std::uint64_t entry_page_amount = static_cast<uint64_t>(entry->length / page_size);
-
+                std::uint64_t entry_page_amount = static_cast<uint64_t>(entry->length / page_size);         
+                
                 push_list(entry->base, entry_page_amount);
             }
         } 
@@ -61,14 +60,14 @@ namespace Memory::Pmm {
     }
 
     void push_list(std::uint64_t phys, std::uint64_t page_amount) {
-        FreeList* virtual_mem = reinterpret_cast<FreeList*>(get_hhdm() + phys);  
+        FreeList* node = reinterpret_cast<FreeList*>(phys + Limine::get_hhdm());
         
-        virtual_mem->num_pages = page_amount;
+        node->pa = phys;
+        node->num_pages = page_amount;
 
-        virtual_mem->next = freelist_head;
-        freelist_head = virtual_mem;        
+        node->next = freelist_head;
+        freelist_head = node;        
         
-        Util::klog("push_list: phys=0x%llx virt=0x%llx pages=%llu\n",                                                                                                                             
-        phys, reinterpret_cast<std::uint64_t>(virtual_mem), page_amount);   
+        Util::klog("push_list: phys=0x%llx \n", phys);   
     }
 }

@@ -53,4 +53,9 @@ namespace Limine {
         .revision = 0,
         .response = nullptr
     };
+
+     // write into or read from a physical address
+    inline std::uint64_t get_hhdm() {
+        return Limine::hhdm.response->offset; 
+    }
 } 
