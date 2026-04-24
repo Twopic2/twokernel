@@ -11,16 +11,20 @@ and leave the entire lower half alone for userspace.
  */
 
 namespace Memory::Pmm {
-    constexpr std::size_t page_size = 0x1000;
-
+    namespace {
+        constexpr std::size_t page_size = 0x1000;
+    }
+    
     struct FreeList {
         struct FreeList* next;
         std::uint64_t num_pages;
         std::uint64_t pa;
     };
 
+    static FreeList* freelist_head {};
+
     std::uintptr_t alloc(std::size_t count);
-    void free(void* phys_mem, std::size_t size);
+    void free( std::uintptr_t phys_mem, std::size_t size);
 
     void push_list(std::uint64_t phys, std::uint64_t page_amount);
 

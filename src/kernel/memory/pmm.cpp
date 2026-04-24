@@ -6,8 +6,6 @@
 #include <memory/pmm.hpp>
 
 namespace Memory::Pmm {
-    FreeList* freelist_head = nullptr;
-
     std::uintptr_t alloc(std::size_t count) {
         FreeList* prev = nullptr;
         FreeList* curr = freelist_head;
@@ -37,8 +35,8 @@ namespace Memory::Pmm {
         return 0;
     }
 
-    void free(void* phys_mem, std::uint64_t count) {
-        push_list(reinterpret_cast<std::uint64_t>(phys_mem), count);
+    void free(std::uintptr_t phys_mem, std::uint64_t count) {
+        push_list(phys_mem, count);
     }
 
     void init_pmm() {

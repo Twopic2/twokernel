@@ -34,6 +34,9 @@ namespace x86::System::Idt {
     
     /// TODO: Make a special exception hanlder for pagefaults since this one is very important during paging
     void x86_pagefault_handler(ArchIrq::IrqFrame*)                   { 
+        std::uint64_t pg_address;
+        asm volatile("mov %%cr2, %0" : "=r" (pg_address));
+
         halt_on_exception("Page Fault (#PF)"); 
     }
 }
