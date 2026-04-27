@@ -2,6 +2,7 @@
 
 // So the most optimal way is to use a RB-tree which allows for O(log n) searching. 
 // But I'm just using a sorted Linked List of Virtual address space for the Kernel/Process
+// VmSpace allows to use heap memory
 
 #include <cstdint>
 namespace Memory::Virt {
