@@ -6,7 +6,7 @@
 #include <cstdint>
 
 #include "libc/string.hpp"
-
+#include "util/kernel_logger.hpp"
 
 /// NOTES:
 /*
@@ -29,55 +29,62 @@ if we go for 2Mib Pages we have only PML4, PDPR, PD, and finally 1Gib pages woul
 
 namespace Memory::Vmm {
     // Credit to @RaidTheWeb inside vmm.hpp for the idea of Direct Map
-    inline constexpr uint64_t PRESENT = (1 << 0); // Is the page currently in physical memory? Triggers pagefault when accessed if not set -> Useful for handling swapped out memory!
-    inline constexpr uint64_t WRITEABLE = (1 << 1); // Read-only if not set, read if set.
-    inline constexpr uint64_t USER = (1 << 2); // Set if accessible to userspace.
-    inline constexpr uint64_t BIGPAGE = (1 << 7); // Sets Page Dir which would be 2mb page 
+    inline constexpr std::uint64_t PRESENT = (1 << 0); // Is the page currently in physical memory? Triggers pagefault when accessed if not set -> Useful for handling swapped out memory!
+    inline constexpr std::uint64_t WRITEABLE = (1 << 1); // Read-only if not set, read if set.
+    inline constexpr std::uint64_t USER = (1 << 2); // Set if accessible to userspace.
+    inline constexpr std::uint64_t WRITETHROUGH = (1 << 3); // Set for writethrough caching, otherwise it's writeback.
+    inline constexpr std::uint64_t BIGPAGE = (1 << 7);  // Disables execution on this section of memory.
+    inline constexpr std::uint64_t NX = (1ul << 63); // Requires EFER.NXE = 1 to be honored.
+    inline constexpr std::uint64_t PADDR_MASK = 0x0000FFFFFFFFF000;
+   
+    inline constexpr std::size_t page_size = 0x1000;
+    inline constexpr std::size_t entry_byte_size = 4096;
 
     // Direct Map way since its way easier 
     struct PageMap {
         std::array<std::uint64_t, 512> entries;
     };
 
-    struct AddrSpace {
+    struct VAddressSpace {
         struct PageMap* pml4;
         std::uintptr_t pml4_pa;
     }; 
     
-    inline struct AddrSpace kernel_space;
+    inline struct VAddressSpace kernel_space;
 
-    static inline void load_cr3(uint64_t cr3_value) {
+    // Credit to RaidtheWeb
+    static inline void flush_tlb() {
+        std::uint64_t cr3;
+        asm volatile("mov %%cr3, %0" : "=r"(cr3));
+        asm volatile("mov %0, %%cr3" : : "r"(cr3));
+        asm volatile("lfence" : : : "memory");
+    }
+
+    static inline void load_cr3(std::uint64_t cr3_value) {
         asm volatile("mov %0, %%cr3" :: "r"(cr3_value) : "memory");
     }
 
-    static inline AddrSpace new_pagemap() {
+    static inline VAddressSpace new_pagemap() {
+        Util::klog("Creating Vaddress space\n");
+
         std::uintptr_t pa = Pmm::alloc(1);
 
         PageMap* pml4 = reinterpret_cast<PageMap*>(pa + Limine::hhdm.response->offset);
-        pml4->entries.fill(0);
+        LibC::memset(pml4->entries.data(), 0, sizeof(pml4->entries));
 
-        return AddrSpace{ .pml4 = pml4, .pml4_pa = pa };
+        Util::klog("Finished Creating Vaddress space\n");
+        return VAddressSpace{ .pml4 = pml4, .pml4_pa = pa };
     }
 
-    static inline std::uint64_t convert_flag(std::uint64_t flags) {
-        std::uint64_t value = PRESENT;
+    PageMap* get_next_level(struct PageMap& entry, std::size_t index, 
+        bool allocates);
 
-        if (flags & WRITEABLE)  value |= WRITEABLE;
-        if (flags & USER)       value |= USER;
-        if (flags & BIGPAGE)    value |= BIGPAGE;
+    void map_limine_kernel_addr(std::uintptr_t start, std::uintptr_t end, std::uint64_t flags);
 
-        return value;
-    }
-
-    auto get_level(struct PageMap& entry);
-
-    auto get_pte(std::uintptr_t va);
-
-    void alloc(std::uint64_t size);
-    void free(void* addr);
+    void map(struct PageMap& pagemap, std::uintptr_t pa, std::uintptr_t va, std::size_t length, std::uint64_t flags);
     
-    void map(std::uintptr_t pa, std::uintptr_t va, std::size_t length, std::uint64_t flags);
-    void unmap(std::uintptr_t pa, std::uintptr_t va, std::size_t length);
+    /* PageMap no longer points to pa */
+    void unmap(struct PageMap& pagemap, std::uintptr_t va, std::size_t length);
 
-    void init_vm();
+    void init();
 }

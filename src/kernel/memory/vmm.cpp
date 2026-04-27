@@ -1,5 +1,141 @@
 #include "memory/vmm.hpp"
+#include "limine/requests.hpp"
+#include "memory/pmm.hpp"
+#include <cstdint>
+#include "arch/x86-64/arch/cpu.hpp"
+
+extern "C" void* _text_start[];   
+extern "C" void* _text_end[];
+extern "C" void* _rodata_start[];
+extern "C" void* _rodata_end[];
+extern "C" void*  _data_start[];
+extern "C" void* _data_end[];
 
 namespace Memory::Vmm {
+    void init() {
+        Util::klog("Init VMM\n");
 
+        kernel_space = new_pagemap();
+
+        Util::klog("Upper Address Vaddr allocated\n");        
+        for (std::size_t i = 256; i < 512; i++) {
+            std::uintptr_t pdpt_pa = Pmm::alloc(1);
+            auto* pdpt = reinterpret_cast<PageMap*>(pdpt_pa + Limine::get_hhdm());
+            LibC::memset(pdpt->entries.data(), 0, sizeof(pdpt->entries));
+            kernel_space.pml4->entries[i] = pdpt_pa | PRESENT | WRITEABLE;
+        }
+        Util::klog("Finished Upper Address Vaddr allocated\n");
+
+        Util::klog("Mapping Kernel Space\n");
+        const auto* memmap = Limine::memmap.response;
+
+        for (std::size_t i = 0; i < memmap->entry_count; i++) {
+            struct limine_memmap_entry* entry = memmap->entries[i];
+
+            if (entry->type == LIMINE_MEMMAP_USABLE ||
+                entry->type == LIMINE_MEMMAP_FRAMEBUFFER ||
+                entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE ||
+                entry->type == LIMINE_MEMMAP_EXECUTABLE_AND_MODULES) {
+
+                std::uintptr_t v_addr = Limine::get_hhdm() + entry->base;
+
+                map(*kernel_space.pml4, entry->base, v_addr, entry->length,
+                    PRESENT | WRITEABLE | NX);
+            }
+        }
+        Util::klog("Finished mapping Kernel's Virtual address\n");
+
+        Util::klog("Started limine_executable_address_request Mapping\n");        
+        map_limine_kernel_addr(reinterpret_cast<std::uintptr_t>(_text_start),
+                               reinterpret_cast<std::uintptr_t>(_text_end),
+                               PRESENT);
+        map_limine_kernel_addr(reinterpret_cast<std::uintptr_t>(_rodata_start),
+                               reinterpret_cast<std::uintptr_t>(_rodata_end),
+                               PRESENT | NX);
+        map_limine_kernel_addr(reinterpret_cast<std::uintptr_t>(_data_start),
+                               reinterpret_cast<std::uintptr_t>(_data_end),
+                               PRESENT | WRITEABLE | NX);
+        Util::klog("Finished limine_executable_address_request Mapping\n");
+
+        std::uint64_t efer = 0;
+        asm volatile("rdmsr" : "=A"(efer) : "c"(Cpu::MSREFER));
+        efer |= (1 << 11);
+        asm volatile("wrmsr" :: "c"(Cpu::MSREFER), "A"(efer));
+
+        load_cr3(kernel_space.pml4_pa);
+        Util::klog("VMM loaded CR3=0x%llx\n", kernel_space.pml4_pa);
+
+        Util::klog("Finished setting up VMM\n");
+    }
+
+    void map_limine_kernel_addr(std::uintptr_t start, std::uintptr_t end, std::uint64_t flags) {
+        std::size_t length = end - start;
+        std::uintptr_t pa = start - Limine::kernel_address.response->virtual_base + Limine::kernel_address.response->physical_base;
+        
+        map(*kernel_space.pml4, pa, start, length, flags);
+    }
+
+    void map(struct PageMap& pagemap, std::uintptr_t pa, std::uintptr_t va, 
+        std::size_t length, std::uint64_t flags) {
+        for (std::size_t off = 0; off < length; off += page_size) {
+            std::uintptr_t cur_va = va + off;
+            std::uintptr_t cur_pa = pa + off;
+
+            // Credit to Mintsuki
+            std::size_t pml4_entry = (cur_va & (static_cast<std::uint64_t>(0x1ff) << 39)) >> 39;
+            std::size_t pdpt_entry = (cur_va & (static_cast<std::uint64_t>(0x1ff) << 30)) >> 30;
+            std::size_t pd_entry   = (cur_va & (static_cast<std::uint64_t>(0x1ff) << 21)) >> 21;
+            std::size_t pt_entry   = (cur_va & (static_cast<std::uint64_t>(0x1ff) << 12)) >> 12;
+
+            PageMap* pdpt = get_next_level(pagemap, pml4_entry, true);
+            PageMap* pd   = get_next_level(*pdpt,   pdpt_entry, true);
+            PageMap* pt   = get_next_level(*pd,     pd_entry,   true);
+
+            pt->entries[pt_entry] = cur_pa | flags;
+        }
+    }
+
+    void unmap(struct PageMap& pagemap, std::uintptr_t va, std::size_t length) {
+        for (std::size_t i = 0; i < length; i += page_size) {
+            std::uintptr_t cur_va = va + i;
+
+            std::size_t pml4_entry = (cur_va & (static_cast<std::uint64_t>(0x1ff) << 39)) >> 39;
+            std::size_t pdpt_entry = (cur_va & (static_cast<std::uint64_t>(0x1ff) << 30)) >> 30;
+            std::size_t pd_entry   = (cur_va & (static_cast<std::uint64_t>(0x1ff) << 21)) >> 21;
+            std::size_t pt_entry   = (cur_va & (static_cast<std::uint64_t>(0x1ff) << 12)) >> 12;
+
+            PageMap* pdpt = get_next_level(pagemap, pml4_entry, false);
+            PageMap* pd   = get_next_level(*pdpt,   pdpt_entry, false);
+            PageMap* pt   = get_next_level(*pd,     pd_entry,   false);
+
+            pt->entries[pt_entry] = 0;
+        }   
+    }
+
+    PageMap* get_next_level(struct PageMap& entry, std::size_t cur_level,
+        bool allocate) {
+        std::uint64_t _entry = entry.entries[cur_level];
+        
+        if (_entry & PRESENT) {
+            std::uintptr_t next_pa = _entry & PADDR_MASK;
+            std::uintptr_t next_va = next_pa + Limine::get_hhdm();
+            
+            PageMap* next_level = reinterpret_cast<PageMap*>(next_va);
+            return next_level;        
+        }
+
+        if (allocate) {
+            std::uintptr_t new_pa = Pmm::alloc(1);
+            PageMap* next_level = reinterpret_cast<PageMap*>(new_pa + Limine::get_hhdm());
+            asm volatile("sfence" : : : "memory"); // Ensure zeroing is visible before entry is set.
+
+            LibC::memset(next_level->entries.data(), 0, entry_byte_size);
+            entry.entries[cur_level] = new_pa | PRESENT | WRITEABLE;
+
+            return next_level;
+        } 
+        
+        return nullptr;
+    }
 }
+

@@ -1,4 +1,5 @@
 #include "memory/pmm.hpp"
+#include "memory/vmm.hpp"
 #include <boot/boot.hpp>
 #include <limine/requests.hpp>
 #include <util/kernel_logger.hpp>
@@ -37,6 +38,7 @@ extern "C" void kmain() {
     }
 
     Memory::Pmm::init_pmm();
+    Memory::Vmm::init();
 
     // Once we finish we halt
     CxxRuntime::hcf();

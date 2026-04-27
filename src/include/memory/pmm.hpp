@@ -11,10 +11,6 @@ and leave the entire lower half alone for userspace.
  */
 
 namespace Memory::Pmm {
-    namespace {
-        constexpr std::size_t page_size = 0x1000;
-    }
-    
     struct FreeList {
         struct FreeList* next;
         std::uint64_t num_pages;
@@ -24,7 +20,8 @@ namespace Memory::Pmm {
     static FreeList* freelist_head {};
 
     std::uintptr_t alloc(std::size_t count);
-    void free( std::uintptr_t phys_mem, std::size_t size);
+    void free(std::uintptr_t phys_mem, std::size_t size);
+    void reclaim_bootloader(std::uint64_t memap_type, std::uintptr_t phys_mem, std::uintptr_t page_amount);
 
     void push_list(std::uint64_t phys, std::uint64_t page_amount);
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <limine.h>
 #include <std/cstdint>
 
