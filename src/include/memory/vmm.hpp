@@ -35,8 +35,9 @@ namespace Memory::Vmm {
     inline constexpr std::uint64_t WRITETHROUGH = (1 << 3); // Set for writethrough caching, otherwise it's writeback.
     inline constexpr std::uint64_t BIGPAGE = (1 << 7);  // Disables execution on this section of memory.
     inline constexpr std::uint64_t NX = (1ul << 63); // Requires EFER.NXE = 1 to be honored.
-    inline constexpr std::uint64_t PADDR_MASK = 0x0000FFFFFFFFF000;
-   
+    inline constexpr std::uint64_t PADDR_MASK = 0x0000FFFFFFFFF000; // Getting PA from va 
+    inline constexpr uint64_t OFFMASK = 0b111111111111;
+
     inline constexpr std::size_t page_size = 0x1000;
     inline constexpr std::size_t entry_byte_size = 4096;
 
@@ -80,11 +81,14 @@ namespace Memory::Vmm {
         bool allocates);
 
     void map_limine_kernel_addr(std::uintptr_t start, std::uintptr_t end, std::uint64_t flags);
-
     void map(struct PageMap& pagemap, std::uintptr_t pa, std::uintptr_t va, std::size_t length, std::uint64_t flags);
-    
     /* PageMap no longer points to pa */
     void unmap(struct PageMap& pagemap, std::uintptr_t va, std::size_t length);
+
+    std::uintptr_t va_to_pa(struct VAddressSpace& space, std::uintptr_t va);
+
+    void* vm_alloc(std::size_t pages, std::uint64_t flags);
+    void  vm_free(void* va, std::size_t pages);
 
     void init();
 }

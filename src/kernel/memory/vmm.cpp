@@ -137,5 +137,18 @@ namespace Memory::Vmm {
         
         return nullptr;
     }
+
+    std::uintptr_t va_to_pa(struct VAddressSpace& space, std::uintptr_t va) {
+        std::size_t pml4_entry = (va & (static_cast<std::uint64_t>(0x1ff) << 39)) >> 39;
+        std::size_t pdpt_entry = (va & (static_cast<std::uint64_t>(0x1ff) << 30)) >> 30;
+        std::size_t pd_entry   = (va & (static_cast<std::uint64_t>(0x1ff) << 21)) >> 21;
+        std::size_t pt_entry   = (va & (static_cast<std::uint64_t>(0x1ff) << 12)) >> 12;
+
+        PageMap* pdpt = get_next_level(*space.pml4, pml4_entry, false);
+        PageMap* pd   = get_next_level(*pdpt,      pdpt_entry, false);
+        PageMap* pt   = get_next_level(*pd,        pd_entry,   false);
+
+        return (pt->entries[pt_entry] & PADDR_MASK) | (va & OFFMASK);
+    }
 }
 
