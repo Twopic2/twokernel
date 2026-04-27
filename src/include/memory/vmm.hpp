@@ -87,8 +87,8 @@ namespace Memory::Vmm {
 
     std::uintptr_t va_to_pa(struct VAddressSpace& space, std::uintptr_t va);
 
-    void* vm_alloc(std::size_t pages, std::uint64_t flags);
-    void  vm_free(void* va, std::size_t pages);
+    //void* vm_alloc(std::size_t pages, std::uint64_t flags);
+    //void  vm_free(void* va, std::size_t pages);
 
     void init();
 }
