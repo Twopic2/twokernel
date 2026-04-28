@@ -32,7 +32,7 @@ https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
 ### 04 — Memory
 - [x] PMM with free-list allocator
 - [x] VMM: 4-level paging, kernel HHDM mapping, kernel section mapping with NX, EFER.NX, CR3 load
-- [ ] Reclaim `bootloader_reclaimable` memory after VMM init (stub exists, not wired into `kmain`)
+- [x] Reclaim `bootloader_reclaimable` memory after VMM init (stub exists, not wired into `kmain`)
 
 ## 05 — Scheduling
 - [ ] `Thread`/`Task` struct (registers, kernel stack, state)
