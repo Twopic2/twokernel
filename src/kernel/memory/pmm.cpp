@@ -68,13 +68,11 @@ namespace Memory::Pmm {
         freelist_head = node;        
     }
 
-    void free_limine_bootloader(std::uint64_t memap_type, std::uintptr_t phys_mem, std::uintptr_t page_amount) {
-        Util::klog("Reclamining Bootloader's Memory\n");
-        
-        if (memap_type == Limine::Memmap::bootloader) {
+    void reclaim_bootloader(std::uint64_t memap_type, std::uintptr_t phys_mem, std::uintptr_t page_amount) {
+        if (memap_type == Limine::Memmap::bootloader && page_amount != 0) {
             push_list(phys_mem, page_amount);
         }
-
-        Util::klog("Finished Reclaiming Bootloader's memory\n");
+        
+        Util::klog("[PMM] Reclaiming bootloader memory: base=0x%llx pages=%llu\n", phys_mem, page_amount);
     }
 }

@@ -33,18 +33,13 @@ https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
 - [x] PMM with free-list allocator
 - [x] VMM: 4-level paging, kernel HHDM mapping, kernel section mapping with NX, EFER.NX, CR3 load
 - [ ] Reclaim `bootloader_reclaimable` memory after VMM init (stub exists, not wired into `kmain`)
-- [ ] Kernel heap (`kmalloc`/`kfree`, slab or bump-then-free-list on top of PMM)
-- [ ] `unmap` should also free intermediate page tables when empty + INVLPG / TLB shootdown
-- [ ] Replace PIC with APIC + LAPIC timer (or HPET) — needed for preemptive scheduling
-- [ ] ACPI table parsing (RSDP/MADT) — feeds APIC/SMP
-- [ ] PS/2 keyboard or serial input for interactive debugging
 
 ## 05 — Scheduling
 - [ ] `Thread`/`Task` struct (registers, kernel stack, state)
 - [ ] Context switch in asm (save/restore GPRs, RFLAGS, RIP, RSP)
 - [ ] Per-CPU structures + `gs`/`swapgs` setup
 - [ ] Ready queue + round-robin scheduler
-- [ ] Timer-driven preemption (LAPIC timer ISR → `schedule()`)
+- [ ] Timer-driven preemption (PIC timer ISR → `schedule()`)
 - [ ] `sleep`/wait queues, blocking primitives
 - [ ] Idle thread
 
@@ -56,6 +51,11 @@ https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
 - [ ] `iretq`-based ring 3 entry
 - [ ] Syscall entry: SYSCALL/SYSRET, MSR setup (STAR/LSTAR/SFMASK)
 - [ ] Initial syscall set (write, exit, getpid, mmap, brk)
+- [ ] Kernel heap (`kmalloc`/`kfree`, slab or bump-then-free-list on top of PMM)
+- [ ] `unmap` should also free intermediate page tables when empty + INVLPG / TLB shootdown
+- [ ] Replace PIC with APIC + LAPIC timer (or HPET) — needed for preemptive scheduling
+- [ ] ACPI table parsing (RSDP/MADT) — feeds APIC/SMP
+- [ ] PS/2 keyboard or serial input for interactive debugging
 
 ## 07 — IPC
 - [ ] Pipes or message ports

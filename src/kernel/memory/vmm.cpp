@@ -32,10 +32,10 @@ namespace Memory::Vmm {
         for (std::size_t i = 0; i < memmap->entry_count; i++) {
             struct limine_memmap_entry* entry = memmap->entries[i];
 
-            if (entry->type == LIMINE_MEMMAP_USABLE ||
-                entry->type == LIMINE_MEMMAP_FRAMEBUFFER ||
-                entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE ||
-                entry->type == LIMINE_MEMMAP_EXECUTABLE_AND_MODULES) {
+            if (entry->type == Limine::Memmap::usable||
+                entry->type == Limine::Memmap::framebuffer ||
+                entry->type == Limine::Memmap::bootloader ||
+                entry->type == Limine::Memmap::kernel_and_modules) {
 
                 std::uintptr_t v_addr = Limine::get_hhdm() + entry->base;
 
@@ -66,6 +66,17 @@ namespace Memory::Vmm {
         Util::klog("VMM loaded CR3=0x%llx\n", kernel_space.pml4_pa);
 
         Util::klog("Finished setting up VMM\n");
+
+        for (std::size_t i = 0; i < memmap->entry_count; i++) {
+            auto* entry = memmap->entries[i];
+
+            if (entry->length < page_size) {
+                continue;
+            }
+
+            auto _page_amount = entry->length / page_size;
+            Pmm::reclaim_bootloader(entry->type, entry->base, _page_amount);
+        }
     }
 
     void map_limine_kernel_addr(std::uintptr_t start, std::uintptr_t end, std::uint64_t flags) {
@@ -151,4 +162,3 @@ namespace Memory::Vmm {
         return (pt->entries[pt_entry] & PADDR_MASK) | (va & OFFMASK);
     }
 }
-
