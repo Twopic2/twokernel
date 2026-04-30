@@ -5,6 +5,9 @@
 #include <std/cstdint>
 #include <std/array>
 
+/// CREDIT: 
+// Thanks to Qwinci for the isr.s dump. His stubs.s helped me a lot
+
 /// TODO: Should change the Pic to Apicx2
 /// CREDIT: https://wiki.osdev.org/8259_PIC
 /// Big thanks to the osdev wiki for helping me set up the 8259 Pic. 
@@ -42,5 +45,8 @@ namespace x86::System::Irq {
     void irq_mask(std::uint8_t irq_line);
     void irq_unmask(std::uint8_t irq_line);
 
+    void register_irq_hanlder(std::uint32_t num, IrqHandler handler, std::uint8_t def = 32);
     void register_exception_handler(std::uint8_t n, IrqHandler handler);
+
+    void deregister_handler(std::uint8_t n);
 }

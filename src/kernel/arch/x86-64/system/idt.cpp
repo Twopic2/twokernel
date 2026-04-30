@@ -67,7 +67,6 @@ namespace x86::System::Idt {
         }
         
         Util::klog("idt: stubs installed for all %u vectors\n", idt_table.size());
-
         for (std::uint32_t i {0}; i < x86_exception_hanlders.size(); i++) {
             if (x86_exception_hanlders[i] != nullptr) {
                 Irq::register_exception_handler(i, x86_exception_hanlders[i]);

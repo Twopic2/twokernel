@@ -79,6 +79,7 @@ namespace Memory::Vmm {
 
     PageMap* get_next_level(struct PageMap& entry, std::size_t index, bool allocates);
 
+    void fill_kernel_entries(struct VAddressSpace& vaddr);
     void map_limine_kernel_addr(uintptr_t start, std::uintptr_t end, std::uint64_t flags);
     void map(struct PageMap& pagemap, std::uintptr_t pa, std::uintptr_t va, std::size_t length, std::uint64_t flags);
     /* PageMap no longer points to pa */

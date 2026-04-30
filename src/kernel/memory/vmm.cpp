@@ -3,6 +3,7 @@
 #include "memory/pmm.hpp"
 #include <cstdint>
 #include "arch/x86-64/arch/cpu.hpp"
+#include "util/align.hpp"
 
 extern "C" void* _text_start[];   
 extern "C" void* _text_end[];
@@ -16,16 +17,8 @@ namespace Memory::Vmm {
         Util::klog("Init VMM\n");
 
         kernel_space = new_pagemap();
-
-        Util::klog("Upper Address Vaddr allocated\n");        
-        for (std::size_t i = 256; i < 512; i++) {
-            std::uintptr_t pdpt_pa = Pmm::alloc(1);
-            auto* pdpt = reinterpret_cast<PageMap*>(pdpt_pa + Limine::get_hhdm());
-            LibC::memset(pdpt->entries.data(), 0, sizeof(pdpt->entries));
-            kernel_space.pml4->entries[i] = pdpt_pa | PRESENT | WRITEABLE;
-        }
-        Util::klog("Finished Upper Address Vaddr allocated\n");
-
+        fill_kernel_entries(kernel_space);
+      
         Util::klog("Mapping Kernel Space\n");
         const auto* memmap = Limine::memmap.response;
 
@@ -89,8 +82,8 @@ namespace Memory::Vmm {
     void map(struct PageMap& pagemap, std::uintptr_t pa, std::uintptr_t va, 
         std::size_t length, std::uint64_t flags) {
         for (std::size_t off = 0; off < length; off += page_size) {
-            std::uintptr_t cur_va = va + off;
-            std::uintptr_t cur_pa = pa + off;
+            std::uintptr_t cur_va = Util::Align::align_down(va + off, page_size);
+            std::uintptr_t cur_pa = Util::Align::align_down(pa + off, page_size);
 
             // Credit to Mintsuki
             std::size_t pml4_entry = (cur_va & (static_cast<std::uint64_t>(0x1ff) << 39)) >> 39;
@@ -108,7 +101,7 @@ namespace Memory::Vmm {
 
     void unmap(struct PageMap& pagemap, std::uintptr_t va, std::size_t length) {
         for (std::size_t i = 0; i < length; i += page_size) {
-            std::uintptr_t cur_va = va + i;
+            std::uintptr_t cur_va = Util::Align::align_down(va + i, page_size);
 
             std::size_t pml4_entry = (cur_va & (static_cast<std::uint64_t>(0x1ff) << 39)) >> 39;
             std::size_t pdpt_entry = (cur_va & (static_cast<std::uint64_t>(0x1ff) << 30)) >> 30;
@@ -160,5 +153,16 @@ namespace Memory::Vmm {
         PageMap* pt   = get_next_level(*pd,        pd_entry,   false);
 
         return (pt->entries[pt_entry] & PADDR_MASK) | (va & OFFMASK);
+    }
+
+    void fill_kernel_entries(struct VAddressSpace& vaddr) {
+        Util::klog("kernel_space upper half vaddress init\n");        
+        for (std::size_t i = 256; i < 512; i++) {
+            std::uintptr_t pdpt_pa = Pmm::alloc(1);
+            auto* pdpt = reinterpret_cast<PageMap*>(pdpt_pa + Limine::get_hhdm());
+            LibC::memset(pdpt->entries.data(), 0, sizeof(pdpt->entries));
+            vaddr.pml4->entries[i] = pdpt_pa | PRESENT | WRITEABLE;
+        }
+        Util::klog("finished kernel_space upper half vaddress init\n");
     }
 }

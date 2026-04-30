@@ -82,6 +82,14 @@ namespace x86::System::Irq {
         Util::klog("irq: registered handler for exception vector %u\n", n);
     }
 
+    void register_irq_hanlder(std::uint32_t num, IrqHandler handler, std::uint8_t def) {
+        irq_handlers[def + num] = handler;
+    }
+
+    void deregister_handler(std::uint8_t n) {
+        irq_handlers[n] = nullptr;
+    }
+
     extern "C" [[gnu::used]] void arch_interrupt_handler(ArchIrq::IrqFrame* frame, std::uint32_t vector) {
         if (auto h = irq_handlers[vector]) {
             h(frame);

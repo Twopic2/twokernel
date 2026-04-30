@@ -1,3 +1,5 @@
+#include "arch/x86-64/dev/timer.hpp"
+#include "tests/ktest.hpp"
 #include "memory/pmm.hpp"
 #include "memory/vmm.hpp"
 #include <boot/boot.hpp>
@@ -39,6 +41,10 @@ extern "C" void kmain() {
 
     Memory::Pmm::init_pmm();
     Memory::Vmm::init();
+
+    x86::System::Irq::register_irq_hanlder(0, x86::Dev::Timer::x86_IRQ0_timer);
+
+    Tests::run_all();
 
     // Once we finish we halt
     CxxRuntime::hcf();

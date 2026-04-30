@@ -95,8 +95,12 @@ set(KERNEL_SOURCES
     src/kernel/arch/x86-64/system/irq.cpp
     src/kernel/arch/x86-64/system/exceptions.cpp
     src/kernel/arch/x86-64/system/isr.s
+    src/kernel/arch/x86-64/dev/timer.cpp
     src/kernel/memory/pmm.cpp
     src/kernel/memory/vmm.cpp
+    src/kernel/tests/pmm_tests.cpp
+    src/kernel/tests/vmm_tests.cpp
+    src/kernel/tests/irq_tests.cpp
 )
 
 set(FLANTERM_SOURCES

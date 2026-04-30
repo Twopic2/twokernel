@@ -14,11 +14,9 @@ namespace x86 {
     void exception_load() {
         System::Irq::pic_remap();
 
-        Util::klog("Masking Irq\n");
         for (int i {0}; i < 16; i++) {
             System::Irq::irq_mask(i);
         }
-        Util::klog("Finished irq mask\n");
 
         Util::klog("Loading Interrupts/Idt\n");
         System::Idt::idt_init();

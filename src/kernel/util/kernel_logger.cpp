@@ -27,6 +27,25 @@ namespace Util {
                     break;
                 }
 
+                case 'd': {
+                    int val = va_arg(args, int);
+                    char tmp[20];
+                    int i = 0;
+                    if (val < 0) { *str++ = '-'; val = -val; }
+                    if (val == 0) {
+                        tmp[i++] = '0';
+                    } else {
+                        while (val > 0) {
+                            tmp[i++] = '0' + (val % 10);
+                            val /= 10;
+                        }
+                    }
+                    while (i > 0) {
+                        *str++ = tmp[--i];
+                    }
+                    break;
+                }
+
                 case 'u': {
                     unsigned int val = va_arg(args, unsigned int);
                     char tmp[20];
