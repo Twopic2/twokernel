@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <string_view>
 #include <util/kernel_logger.hpp>
-#include <util/color.hpp>
 #include <libc/string.hpp>
 #include <drivers/fbtty.hpp>
 
@@ -151,47 +150,6 @@ namespace Util {
         }
 
         return value;
-    }
-
-    static char* push_dec_u8(char* p, std::uint8_t v) {
-        if (v >= 100) {
-            *p++ = '0' + v / 100;
-            *p++ = '0' + (v / 10) % 10;
-            *p++ = '0' + v % 10;
-        } else if (v >= 10) {
-            *p++ = '0' + v / 10;
-            *p++ = '0' + v % 10;
-        } else {
-            *p++ = '0' + v;
-        }
-        return p;
-    }
-
-    static char* push_fg_truecolor(char* p, std::uint32_t rgb) {
-        auto ch = Color::rgb_to_value(rgb);
-        *p++ = '\x1b'; *p++ = '['; *p++ = '3'; *p++ = '8';
-        *p++ = ';';    *p++ = '2'; *p++ = ';';
-        p = push_dec_u8(p, ch.r); *p++ = ';';
-        p = push_dec_u8(p, ch.g); *p++ = ';';
-        p = push_dec_u8(p, ch.b);
-        *p++ = 'm';
-        return p;
-    }
-
-    void klog_color(std::uint32_t rgb, const char* fmt, ...) {
-        char buf[1024];
-        char* p = buf;
-
-        p = push_fg_truecolor(p, rgb);
-
-        va_list args;
-        va_start(args, fmt);
-        p += vsnprintf(p, fmt, args);
-        va_end(args);
-
-        *p++ = '\x1b'; *p++ = '['; *p++ = '0'; *p++ = 'm';
-
-        Drivers::g_tty->write_terminal(buf, p - buf);
     }
     
     void klog(const char* fmt, ...) {

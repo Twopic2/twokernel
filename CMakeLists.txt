@@ -113,7 +113,8 @@ set(LIBC_SOURCES
     src/libc/ctype.cpp
 )
 
-add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCES})
+add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCES}
+    src/include/util/ansi.hpp)
 
 if(CMAKE_HOST_APPLE)
     target_compile_definitions(twokernel.elf PRIVATE TWOKERNEL_HOST_MACOS)

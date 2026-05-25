@@ -2,18 +2,20 @@
 #include "tests/ktest.hpp"
 #include "memory/pmm.hpp"
 #include "memory/vmm.hpp"
-#include "util/color.hpp"
 #include <boot/boot.hpp>
 #include <limine/requests.hpp>
 #include <util/kernel_logger.hpp>
 #include <drivers/fbtty.hpp>
 #include <drivers/framebuffer.hpp>
 #include <arch/x86-64/arch.hpp>
+#include "util/ansi.hpp"
 
 extern "C" {
 #include <flanterm.h>
 #include <flanterm_backends/fb.h>
 }
+
+using namespace Util::Ansi;
 
 extern "C" void kmain() {
     // Ensures the proper base revision (see spec).
@@ -45,7 +47,8 @@ extern "C" void kmain() {
 
     x86::System::Irq::register_irq_hanlder(0, x86::Dev::Timer::x86_IRQ0_timer);
 
-    Util::klog_color(Util::Color::get_green(), "[Info]");
+    Util::klog("%s%s[Info] %s\n", BOLD, GREEN, RESET); 
+
     //Tests::run_all();
 
     // Once we finish we halt
