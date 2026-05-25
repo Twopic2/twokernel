@@ -110,6 +110,7 @@ set(FLANTERM_SOURCES
 
 set(LIBC_SOURCES
     src/libc/string.cpp
+    src/libc/ctype.cpp
 )
 
 add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCES})
