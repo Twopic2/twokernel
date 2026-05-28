@@ -39,14 +39,13 @@ namespace x86::System::Irq {
 
     inline std::array<IrqHandler, 256> irq_handlers {};
 
-    void eoi(std::uint8_t vector);
+    void eoi(const std::uint8_t vector);
     void pic_remap();
     void pic_disable();
     void irq_mask(std::uint8_t irq_line);
     void irq_unmask(std::uint8_t irq_line);
 
-    void register_irq_hanlder(std::uint32_t num, IrqHandler handler, std::uint8_t def = 32);
-    void register_exception_handler(std::uint8_t n, IrqHandler handler);
-
+    void hardware_irq_dispatch(std::uint8_t irq_line, ArchIrq::IrqFrame* frame);
+    void register_exception_handler(const std::uint8_t n, IrqHandler handler);
     void deregister_handler(std::uint8_t n);
 }

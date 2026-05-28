@@ -40,6 +40,9 @@ namespace Drivers::Pit {
     
     inline volatile std::uint64_t pit_clocks = 0;
     inline volatile std::uint64_t tick = 0;
+    
+    inline std::uint64_t seconds = 0;
+    inline std::uint64_t milli_seconds = 0;
 
     void init_pit(std::uint8_t commands, std::uint8_t access, std::uint8_t pit_mode);
 
@@ -47,5 +50,8 @@ namespace Drivers::Pit {
     void set_reload_value(std::size_t count, std::uint8_t access);
     std::size_t read_pit_count();
     void increase_tick();
+    void increase_time();
     void reset_tick();
+    std::uint64_t get_time_seconds();
+    std::uint64_t get_time_milliseconds();
 }

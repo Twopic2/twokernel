@@ -2,8 +2,6 @@
 #include <arch/x86-64/system/irq.hpp>
 
 namespace Tests {
-    static void dummy_handler(x86::ArchIrq::IrqFrame*) {}
-
     void run_irq_tests() {
         Util::klog("--- IRQ Tests ---\n");
         KTest::reset();
@@ -16,11 +14,6 @@ namespace Tests {
 
         // vectors with no handler (nullptrs in x86_exception_handlers)
         KTEST_ASSERT(x86::System::Irq::irq_handlers[15] == nullptr, "vector 15 has no handler (reserved)");
-
-        // register a hardware IRQ handler (IRQ 1 = keyboard = vector 33)
-        x86::System::Irq::register_irq_hanlder(1, dummy_handler);
-        KTEST_ASSERT(x86::System::Irq::irq_handlers[33] == dummy_handler,
-                     "register_irq_handler stores at vector 32+irq");
 
         // deregister it
         x86::System::Irq::deregister_handler(33);

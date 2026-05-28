@@ -42,6 +42,8 @@ extern "C" void kmain() {
         x86::exception_load();
     }
 
+    x86::Dev::Timer::timer_init(); 
+
     Memory::Pmm::init_pmm();
     Memory::Vmm::init();
 

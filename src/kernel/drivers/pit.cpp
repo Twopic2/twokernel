@@ -37,12 +37,25 @@ namespace Drivers::Pit {
     }
 
     void increase_tick() {
-        tick++;
+        tick += 1;
         pit_clocks += RELOAD;
     }
 
     void reset_tick() {
         tick = 0;
         pit_clocks = 0;
+    }
+
+    void increase_time() {
+        seconds       = pit_clocks / HZ;
+        milli_seconds = (pit_clocks * 1000) / HZ;
+    }
+
+    std::uint64_t get_time_seconds() {
+        return pit_clocks / HZ;
+    }
+
+    std::uint64_t get_time_milliseconds() {
+        return (pit_clocks * 1000) / HZ;
     }
 }

@@ -1,6 +1,7 @@
 #include "arch/x86-64/system/irq.hpp"
 #include "arch/x86-64/arch/io.hpp"
-#include "arch/x86-64/system/idt.hpp"
+#include "arch/x86-64/dev/keyboard.hpp"
+#include "arch/x86-64/dev/timer.hpp"
 #include "util/kernel_logger.hpp"
 #include <cstdint>
 
@@ -32,7 +33,7 @@ namespace x86::System::Irq {
         IO::outb(Pic::SLAVE_CMD, 0xFF);
     }
 
-    void eoi(std::uint8_t vector) {
+    void eoi(const std::uint8_t vector) {
         if (vector >= 8) {
             IO::outb(Pic::SLAVE_CMD, 0x20);
         }
@@ -73,7 +74,7 @@ namespace x86::System::Irq {
         IO::outb(port, value);
     }
 
-    void register_exception_handler(std::uint8_t n, IrqHandler handler) {
+    void register_exception_handler(const std::uint8_t n, IrqHandler handler) {
         if (n >= 32) {
             Util::klog("irq: out of bounds exception vector %u: must be 0-31\n", n);
             for (;;) __asm__ volatile ("cli; hlt");
@@ -83,25 +84,34 @@ namespace x86::System::Irq {
         Util::klog("irq: registered handler for exception vector %u\n", n);
     }
     
-    /// Remember that def = 32
-    void register_irq_hanlder(std::uint32_t num, IrqHandler handler, std::uint8_t def) {
-        irq_handlers[def + num] = handler;
-    }
-
     void deregister_handler(std::uint8_t n) {
         irq_handlers[n] = nullptr;
     }
 
     extern "C" [[gnu::used]] void arch_interrupt_handler(ArchIrq::IrqFrame* frame, std::uint32_t vector) {
-        if (auto h = irq_handlers[vector]) {
-            h(frame);
-        } else {
-            Util::klog("unhandled CPU exception\n");
-            for (;;) __asm__ volatile ("cli; hlt");
-        }
+        // CPU exception
+        if (vector < 32) {
+            if (auto h = irq_handlers[vector]) {
+                h(frame);
+            } else {
+                Util::klog("unhandled CPU exception %u\n", vector);
+                for (;;) __asm__ volatile ("cli; hlt");
+            }
+        } else if (vector < 48) { // Hardware IRQ
+            auto new_vector = vector - 32;
 
-        if (vector >= 32 && vector < 48) {
-            eoi(vector - 0x20);
+            hardware_irq_dispatch(new_vector, frame);
+        }
+    }
+
+    void hardware_irq_dispatch(std::uint8_t irq_line, ArchIrq::IrqFrame *frame) {
+        switch (irq_line) {
+            case 0: 
+                x86::Dev::Timer::isr_timer(frame);
+                break;
+            case 1:
+                x86::Dev::Keyboard::isr_keyboard(frame);
+                break;
         }
     }
 }
