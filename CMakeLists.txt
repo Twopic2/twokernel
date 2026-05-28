@@ -101,6 +101,9 @@ set(KERNEL_SOURCES
     src/kernel/tests/pmm_tests.cpp
     src/kernel/tests/vmm_tests.cpp
     src/kernel/tests/irq_tests.cpp
+    src/kernel/lib/circularbuffer.cpp
+    src/kernel/arch/x86-64/dev/keyboard.cpp
+    src/kernel/drivers/pit.cpp
 )
 
 set(FLANTERM_SOURCES
@@ -113,8 +116,7 @@ set(LIBC_SOURCES
     src/libc/ctype.cpp
 )
 
-add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCES}
-    src/include/util/ansi.hpp)
+add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCES})
 
 if(CMAKE_HOST_APPLE)
     target_compile_definitions(twokernel.elf PRIVATE TWOKERNEL_HOST_MACOS)

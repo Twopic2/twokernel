@@ -6,6 +6,9 @@
 #include <std/cstdint>
 #include <std/cstddef>
 
+/// @Note:
+/// /dev dir would contain all the Hardware Interrupts 
+
 // 0b1110 or 0xE: 64-bit Interrupt Gate
 // 0b1111 or 0xF: 64-bit Trap Gate
 
@@ -27,11 +30,11 @@ namespace x86::System::Idt {
     extern "C" void* irq_stubs[];
 
     constexpr std::uint8_t code = 0x08;
-    constexpr std::size_t int_vector {256};
+    constexpr std::size_t idt_vector {256};
 
-    inline std::array<IdtEntry, int_vector> idt_table;
+    inline std::array<IdtEntry, idt_vector> idt_table;
 
-    void set_idt_entries(std::uint8_t index, void* handler, std::uint8_t ist, std::uint8_t dpl);
+    void set_idt_entries(std::uint8_t index, void* handler, std::uint8_t ist, std::uint8_t dpl, std::uint8_t type = 0xE);
 
     void idt_init();
     void idtr_asm_load();

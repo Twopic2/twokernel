@@ -2,6 +2,8 @@
 #include "arch/x86-64/system/exceptions.hpp"
 #include "arch/x86-64/system/irq.hpp"
 #include "util/kernel_logger.hpp"
+#include "util/ansi.hpp"
+
 #include <cstdint>
 
 /*
@@ -12,6 +14,7 @@ IRQ	        INT
 8-15	    40–47            
 */
 
+using namespace Util::Ansi;
 namespace x86::System::Idt {
     constexpr std::array<Irq::IrqHandler, 32> x86_exception_hanlders = {
         x86_div_handler,
@@ -48,7 +51,7 @@ namespace x86::System::Idt {
         nullptr,
     };
 
-    void set_idt_entries(std::uint8_t index, void* handler, std::uint8_t ist, std::uint8_t dpl) {
+    void set_idt_entries(std::uint8_t index, void* handler, std::uint8_t ist, std::uint8_t dpl, std::uint8_t type) {
         auto address = reinterpret_cast<std::uintptr_t>(handler);
 
         auto& entry = idt_table[index];
@@ -58,21 +61,22 @@ namespace x86::System::Idt {
         entry.offset2 = static_cast<std::uint32_t>(address >> 32);
 
         entry.selector = code;
-        entry.ist_flags = (ist & 0b111) | (0xE << 8) | (dpl & 0b11) << 13 | 1 << 15;
+        entry.ist_flags = (ist & 0b111) | (type << 8) | (dpl & 0b11) << 13 | 1 << 15;
     }
 
     void idt_init() {
         for (std::uint32_t i {0}; i < idt_table.size(); i++) {
-            set_idt_entries(i, irq_stubs[i], 0x8, 0);
+            set_idt_entries(i, irq_stubs[i], 0, 0);
         }
         
-        Util::klog("idt: stubs installed for all %u vectors\n", idt_table.size());
+        Util::klog("%s%s[debug] default init exception stubs %s\n", BOLD, BLUE, RESET);
         for (std::uint32_t i {0}; i < x86_exception_hanlders.size(); i++) {
+            set_idt_entries(i, irq_stubs[i], 0, 0, 0xF);
             if (x86_exception_hanlders[i] != nullptr) {
                 Irq::register_exception_handler(i, x86_exception_hanlders[i]);
             }
         }
-        Util::klog("idt: exception handlers registered\n");
+        Util::klog("%s%s[debug] finished default init exception stubs%s\n", BOLD, BLUE, RESET);
     }
 
     void idtr_asm_load() {

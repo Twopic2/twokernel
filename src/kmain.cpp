@@ -45,8 +45,6 @@ extern "C" void kmain() {
     Memory::Pmm::init_pmm();
     Memory::Vmm::init();
 
-    x86::System::Irq::register_irq_hanlder(0, x86::Dev::Timer::x86_IRQ0_timer);
-
     Util::klog("%s%s[Info] %s\n", BOLD, GREEN, RESET); 
 
     //Tests::run_all();

@@ -1,5 +1,6 @@
 #include "arch/x86-64/system/irq.hpp"
 #include "arch/x86-64/arch/io.hpp"
+#include "arch/x86-64/system/idt.hpp"
 #include "util/kernel_logger.hpp"
 #include <cstdint>
 
@@ -81,7 +82,8 @@ namespace x86::System::Irq {
         irq_handlers[n] = handler;
         Util::klog("irq: registered handler for exception vector %u\n", n);
     }
-
+    
+    /// Remember that def = 32
     void register_irq_hanlder(std::uint32_t num, IrqHandler handler, std::uint8_t def) {
         irq_handlers[def + num] = handler;
     }

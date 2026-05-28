@@ -11,6 +11,11 @@ namespace x86 {
         return true;
     }
 
+    void irq_load() {
+        Util::klog("Init Irq\n");
+
+    }
+
     void exception_load() {
         System::Irq::pic_remap();
 
