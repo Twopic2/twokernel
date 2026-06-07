@@ -29,11 +29,15 @@ namespace Tests {
     void run_pmm_tests();
     void run_vmm_tests();
     void run_irq_tests();
+    void run_scheduler_tests();
+    void add_init_thread(); 
+    void deque_tests();
 
     inline void run_all() {
         run_pmm_tests();
         run_vmm_tests();
         run_irq_tests();
+        run_scheduler_tests();
         Util::klog("=== Total: %d passed, %d failed ===\n", KTest::passed, KTest::failed);
     }
 }

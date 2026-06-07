@@ -1,6 +1,7 @@
 #include "memory/vmm.hpp"
 #include "limine/requests.hpp"
 #include "memory/pmm.hpp"
+#include <cstddef>
 #include <cstdint>
 #include "arch/x86-64/arch/cpu.hpp"
 #include "util/align.hpp"
@@ -14,12 +15,12 @@ extern "C" void* _data_end[];
 
 namespace Memory::Vmm {
     void init() {
-        Util::klog("Init VMM\n");
+//        Util::klog("Init VMM\n");
 
         kernel_space = new_pagemap();
         fill_kernel_entries(kernel_space);
       
-        Util::klog("Mapping Kernel Space\n");
+//        Util::klog("Mapping Kernel Space\n");
         const auto* memmap = Limine::memmap.response;
 
         for (std::size_t i = 0; i < memmap->entry_count; i++) {
@@ -36,9 +37,9 @@ namespace Memory::Vmm {
                     PRESENT | WRITEABLE | NX);
             }
         }
-        Util::klog("Finished mapping Kernel's Virtual address\n");
+        // Util::klog("Finished mapping Kernel's Virtual address\n");
 
-        Util::klog("Started limine_executable_address_request Mapping\n");        
+//        Util::klog("Started limine_executable_address_request Mapping\n");        
         map_limine_kernel_addr(reinterpret_cast<std::uintptr_t>(_text_start),
                                reinterpret_cast<std::uintptr_t>(_text_end),
                                PRESENT);
@@ -48,7 +49,7 @@ namespace Memory::Vmm {
         map_limine_kernel_addr(reinterpret_cast<std::uintptr_t>(_data_start),
                                reinterpret_cast<std::uintptr_t>(_data_end),
                                PRESENT | WRITEABLE | NX);
-        Util::klog("Finished limine_executable_address_request Mapping\n");
+       // Util::klog("Finished limine_executable_address_request Mapping\n");
 
         std::uint64_t efer = 0;
         asm volatile("rdmsr" : "=A"(efer) : "c"(Cpu::MSREFER));
@@ -56,9 +57,9 @@ namespace Memory::Vmm {
         asm volatile("wrmsr" :: "c"(Cpu::MSREFER), "A"(efer));
 
         load_cr3(kernel_space.pml4_pa);
-        Util::klog("VMM loaded CR3=0x%llx\n", kernel_space.pml4_pa);
+        // Util::klog("VMM loaded CR3=0x%llx\n", kernel_space.pml4_pa);
 
-        Util::klog("Finished setting up VMM\n");
+//        Util::klog("Finished setting up VMM\n");
 
         for (std::size_t i = 0; i < memmap->entry_count; i++) {
             auto* entry = memmap->entries[i];
@@ -156,13 +157,20 @@ namespace Memory::Vmm {
     }
 
     void fill_kernel_entries(struct VAddressSpace& vaddr) {
-        Util::klog("kernel_space upper half vaddress init\n");        
+        // Util::klog("kernel_space upper half vaddress init\n");        
         for (std::size_t i = 256; i < 512; i++) {
             std::uintptr_t pdpt_pa = Pmm::alloc(1);
             auto* pdpt = reinterpret_cast<PageMap*>(pdpt_pa + Limine::get_hhdm());
             LibC::memset(pdpt->entries.data(), 0, sizeof(pdpt->entries));
             vaddr.pml4->entries[i] = pdpt_pa | PRESENT | WRITEABLE;
         }
-        Util::klog("finished kernel_space upper half vaddress init\n");
+        // Util::klog("finished kernel_space upper half vaddress init\n");
+    }
+
+    /// for adding a new vaddr proc
+    void process_fill_kernel_entries(struct VAddressSpace& vaddr) {
+        for (std::size_t i = 256; i < 512; i++) {
+            vaddr.pml4->entries[i] = kernel_space.pml4->entries[i];
+        }
     }
 }

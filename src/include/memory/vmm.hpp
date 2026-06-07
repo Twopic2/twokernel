@@ -66,14 +66,11 @@ namespace Memory::Vmm {
     }
 
     static inline VAddressSpace new_pagemap() {
-        Util::klog("Creating Vaddress space\n");
-
         std::uintptr_t pa = Pmm::alloc(1);
 
         PageMap* pml4 = reinterpret_cast<PageMap*>(pa + Limine::hhdm.response->offset);
         LibC::memset(pml4->entries.data(), 0, sizeof(pml4->entries));
 
-        Util::klog("Finished Creating Vaddress space\n");
         return VAddressSpace{ .pml4 = pml4, .pml4_pa = pa };
     }
 
@@ -86,7 +83,8 @@ namespace Memory::Vmm {
     void unmap(struct PageMap& pagemap, std::uintptr_t va, std::size_t length);
 
     std::uintptr_t va_to_pa(struct VAddressSpace& space, std::uintptr_t va);
-
+    void process_fill_kernel_entries(struct VAddressSpace& vaddr);
+    
     //void* vm_alloc(std::size_t pages, std::uint64_t flags);
     //void  vm_free(void* va, std::size_t pages);
 

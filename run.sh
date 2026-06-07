@@ -13,10 +13,17 @@ if [[ "$1" == "--debug" ]]; then
     DEBUG_FLAGS="-s -S"
 fi
 
+# pass --intlog to log every interrupt/exception the CPU services to qemu.log
+INT_FLAGS=""
+if [[ "$1" == "--intlog" || "$2" == "--intlog" ]]; then
+    INT_FLAGS="-d int -D qemu.log"
+fi
+
 qemu-system-x86_64 \
     -cdrom "$ISO" \
     -m 256M \
     -serial stdio \
     -no-reboot \
     -no-shutdown \
-    $DEBUG_FLAGS
+    $DEBUG_FLAGS \
+    $INT_FLAGS

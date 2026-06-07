@@ -13,14 +13,16 @@ namespace Memory::Pmm {
 
         while (curr) {
             if (curr->num_pages >= count) {
-                if (prev) {
+                if (prev) { 
+                    // Unlinks the curr node due having too little pages
                     prev->next = curr->next;
                 } else {
                     freelist_head = curr->next;
                 }
 
                 if (curr->num_pages > count) {
-                    std::uint64_t phys_offset = curr->pa + count * Vmm::page_size;
+                    auto page_amount = (count * Vmm::page_size);
+                    std::uint64_t phys_offset = curr->pa + page_amount;
                     std::uint64_t page_offset = curr->num_pages - count;
                     
                     push_list(phys_offset, page_offset);
@@ -43,7 +45,7 @@ namespace Memory::Pmm {
     void init_pmm() {
         const auto memmaps = Limine::memmap.response->entries;
 
-        Util::klog("Init PMM\n");
+        // Util::klog("Init PMM\n");
         for (std::size_t i {0}; i < Limine::memmap.response->entry_count; i++) {
             auto* entry = memmaps[i];
 
@@ -55,9 +57,10 @@ namespace Memory::Pmm {
                 push_list(entry->base, entry_page_amount);
             }
         } 
-        Util::klog("Finished mapping physical mem to virtual mem\n");
+        // Util::klog("Finished mapping physical mem to virtual mem\n");
     }
 
+    /// push front
     void push_list(std::uint64_t phys, std::uint64_t page_amount) {
         FreeList* node = reinterpret_cast<FreeList*>(phys + Limine::get_hhdm());
         
@@ -73,6 +76,6 @@ namespace Memory::Pmm {
             push_list(phys_mem, page_amount);
         }
         
-        Util::klog("[PMM] Reclaiming bootloader memory: base=0x%llx pages=%llu\n", phys_mem, page_amount);
+        // Util::klog("[PMM] Reclaiming bootloader memory: base=0x%llx pages=%llu\n", phys_mem, page_amount);
     }
 }

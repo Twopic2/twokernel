@@ -35,12 +35,11 @@ https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
 - [x] Reclaim `bootloader_reclaimable` memory after VMM init (stub exists, not wired into `kmain`)
 
 ## 05 — Scheduling
-- [ ] `Thread`/`Task` struct (registers, kernel stack, state)
-- [ ] Context switch in asm (save/restore GPRs, RFLAGS, RIP, RSP)
-- [ ] Per-CPU structures + `gs`/`swapgs` setup
-- [ ] Ready queue + round-robin scheduler
-- [ ] Timer-driven preemption (PIC timer ISR → `schedule()`)
-- [ ] `sleep`/wait queues, blocking primitives
+- [x] `Thread`/`Task` struct (registers, kernel stack, state)
+- [x] Context switch in asm (save/restore GPRs, RFLAGS, RIP, RSP)
+- [x] Ready queue + round-robin scheduler
+- [x] Timer-driven preemption (PIC timer ISR → `schedule()`)
+- [?] `sleep`/wait queues, blocking primitives
 - [ ] Idle thread
 
 ## 06 — Userspace

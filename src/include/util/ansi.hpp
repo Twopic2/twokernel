@@ -71,3 +71,5 @@ namespace Util::Ansi {
     inline constexpr const char* BG_BR_CYAN    = "\x1b[106m";
     inline constexpr const char* BG_BR_WHITE   = "\x1b[107m";
 }
+
+using namespace Util::Ansi;

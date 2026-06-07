@@ -76,7 +76,7 @@ set(CROSS_FLAGS "\
     -Wall -Wextra \
 ")
 set(CMAKE_C_FLAGS   "${CROSS_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CROSS_FLAGS} -fno-exceptions -fno-rtti")
+set(CMAKE_CXX_FLAGS "${CROSS_FLAGS} -fno-exceptions -fno-rtti -fno-threadsafe-statics")
 set(CMAKE_ASM_FLAGS "${CROSS_FLAGS}")
 
 set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/src/kernel/arch/x86-64/linker.lds)
@@ -96,11 +96,15 @@ set(KERNEL_SOURCES
     src/kernel/arch/x86-64/system/exceptions.cpp
     src/kernel/arch/x86-64/system/isr.s
     src/kernel/arch/x86-64/dev/timer.cpp
+    src/kernel/arch/x86-64/proc/scheduler.cpp
+    src/kernel/arch/x86-64/proc/thread.cpp
+    src/kernel/arch/x86-64/proc/process.cpp
     src/kernel/memory/pmm.cpp
     src/kernel/memory/vmm.cpp
     src/kernel/tests/pmm_tests.cpp
     src/kernel/tests/vmm_tests.cpp
     src/kernel/tests/irq_tests.cpp
+    src/kernel/tests/schedule_tests.cpp
     src/kernel/lib/circularbuffer.cpp
     src/kernel/arch/x86-64/dev/keyboard.cpp
     src/kernel/drivers/pit.cpp
@@ -150,6 +154,7 @@ target_include_directories(twokernel.elf PRIVATE
     src
     src/kernel
     src/include
+    src/include/std
     ${LIMINE_PROTO_DIR}/include
     ${FLANTERM_DIR}/src
 )

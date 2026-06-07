@@ -1,9 +1,9 @@
 #pragma once
 
 #include <arch/x86-64/arch/arch_irq.hpp>
+#include <array>
 #include <cstdint>
 #include <std/cstdint>
-#include <std/array>
 
 /// CREDIT: 
 // Thanks to Qwinci for the isr.s dump. His stubs.s helped me a lot
@@ -45,7 +45,7 @@ namespace x86::System::Irq {
     void irq_mask(std::uint8_t irq_line);
     void irq_unmask(std::uint8_t irq_line);
 
-    void hardware_irq_dispatch(std::uint8_t irq_line, ArchIrq::IrqFrame* frame);
+    void hardware_interrupt_dispatch(std::uint8_t irq_line, ArchIrq::IrqFrame* frame);
     void register_exception_handler(const std::uint8_t n, IrqHandler handler);
     void deregister_handler(std::uint8_t n);
 }

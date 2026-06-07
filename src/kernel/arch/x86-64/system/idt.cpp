@@ -65,12 +65,12 @@ namespace x86::System::Idt {
     }
 
     void idt_init() {
-        for (std::uint32_t i {0}; i < idt_table.size(); i++) {
+        for (std::uint32_t i {}; i < idt_table.size(); i++) {
             set_idt_entries(i, irq_stubs[i], 0, 0);
         }
         
         Util::klog("%s%s[debug] default init exception stubs %s\n", BOLD, BLUE, RESET);
-        for (std::uint32_t i {0}; i < x86_exception_hanlders.size(); i++) {
+        for (std::uint32_t i {}; i < x86_exception_hanlders.size(); i++) {
             set_idt_entries(i, irq_stubs[i], 0, 0, 0xF);
             if (x86_exception_hanlders[i] != nullptr) {
                 Irq::register_exception_handler(i, x86_exception_hanlders[i]);

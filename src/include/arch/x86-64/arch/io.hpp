@@ -1,6 +1,6 @@
 #pragma once
 
-#include <std/cstdint>
+#include <cstdint>
 
 namespace x86::IO {
     inline void outb(std::uint16_t port, std::uint8_t val) {

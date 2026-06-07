@@ -1,10 +1,11 @@
 #pragma once
 
 #include <arch/x86-64/arch/arch_irq.hpp>
+#include <array>
+#include <cstdint>
 #include <std/array>
 #include <std/string_view>
 #include <std/cstdint>
-#include <std/cstddef>
 
 /// @Note:
 /// /dev dir would contain all the Hardware Interrupts 
@@ -30,6 +31,7 @@ namespace x86::System::Idt {
     extern "C" void* irq_stubs[];
 
     constexpr std::uint8_t code = 0x08;
+    constexpr std::uint8_t data = 0x10;
     constexpr std::size_t idt_vector {256};
 
     inline std::array<IdtEntry, idt_vector> idt_table;

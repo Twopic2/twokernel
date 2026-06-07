@@ -1,6 +1,6 @@
 #pragma once
 
-#include <std/cstdint>
+#include <cstdint>
 
 /// RESOURCES: 
 /// https://0xc0ffee.netlify.app/osdev/17-tss#creating-a-tss
@@ -35,7 +35,6 @@ namespace x86::System::Gdt {
 
     struct [[gnu::packed]] TssSegments {
         std::uint32_t reserved0;
-        // when switching to CPL=0, CPL=1, and CPL=2
         std::uint64_t rsp0; // Context switching usermode to kernelmode  
         std::uint64_t rsp1;
         std::uint64_t rsp2;
@@ -66,7 +65,7 @@ namespace x86::System::Gdt {
         std::uint32_t reserved;
     };
 
-    static struct TssSegments tss;
+    inline struct TssSegments tss;
 
     void init_gdt_entries();
     void refresh();

@@ -1,4 +1,5 @@
 #include "arch/x86-64/arch.hpp"
+#include "arch/x86-64/arch/cpu.hpp"
 #include "arch/x86-64/system/gdt.hpp"
 #include "arch/x86-64/system/idt.hpp"
 #include "arch/x86-64/system/irq.hpp"
@@ -12,6 +13,7 @@ namespace x86 {
     }
 
     void exception_load() {
+        Cpu::disable_lapic();
         System::Irq::pic_remap();
 
         for (int i {0}; i < 16; i++) {

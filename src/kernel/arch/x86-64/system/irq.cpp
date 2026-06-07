@@ -81,7 +81,6 @@ namespace x86::System::Irq {
         }
 
         irq_handlers[n] = handler;
-        Util::klog("irq: registered handler for exception vector %u\n", n);
     }
     
     void deregister_handler(std::uint8_t n) {
@@ -89,6 +88,7 @@ namespace x86::System::Irq {
     }
 
     extern "C" [[gnu::used]] void arch_interrupt_handler(ArchIrq::IrqFrame* frame, std::uint32_t vector) {
+        //Util::klog("init arch_interrupt_handler"); 
         // CPU exception
         if (vector < 32) {
             if (auto h = irq_handlers[vector]) {
@@ -100,11 +100,11 @@ namespace x86::System::Irq {
         } else if (vector < 48) { // Hardware IRQ
             auto new_vector = vector - 32;
 
-            hardware_irq_dispatch(new_vector, frame);
+            hardware_interrupt_dispatch(new_vector, frame);
         }
     }
 
-    void hardware_irq_dispatch(std::uint8_t irq_line, ArchIrq::IrqFrame *frame) {
+    void hardware_interrupt_dispatch(std::uint8_t irq_line, ArchIrq::IrqFrame *frame) {
         switch (irq_line) {
             case 0: 
                 x86::Dev::Timer::isr_timer(frame);

@@ -1,16 +1,17 @@
 #include "arch/x86-64/dev/timer.hpp"
 #include "arch/x86-64/arch/arch_irq.hpp"
+#include "arch/x86-64/proc/scheduler.hpp"
 #include "drivers/pit.hpp"
 #include "util/kernel_logger.hpp"
 #include "util/ansi.hpp"
 #include "arch/x86-64/system/irq.hpp"
 
-using namespace Util::Ansi;
-
 namespace x86::Dev::Timer {
-    void isr_timer(ArchIrq::IrqFrame*) {
+    void isr_timer(ArchIrq::IrqFrame* frame) {
         Drivers::Pit::increase_tick();
         Drivers::Pit::increase_time();
+      
+        Proc::Scheduler::g_scheduler.pit_irq_handler(frame);
         
         System::Irq::eoi(0);
     }

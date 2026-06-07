@@ -6,5 +6,5 @@
 
 namespace x86::Dev::Keyboard {
     void isr_keyboard(ArchIrq::IrqFrame* frame);
-    void init();
+    void keyboard_init();
 }

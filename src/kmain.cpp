@@ -1,4 +1,5 @@
 #include "arch/x86-64/dev/timer.hpp"
+#include "arch/x86-64/proc/scheduler.hpp"
 #include "tests/ktest.hpp"
 #include "memory/pmm.hpp"
 #include "memory/vmm.hpp"
@@ -14,8 +15,6 @@ extern "C" {
 #include <flanterm.h>
 #include <flanterm_backends/fb.h>
 }
-
-using namespace Util::Ansi;
 
 extern "C" void kmain() {
     // Ensures the proper base revision (see spec).
@@ -42,12 +41,13 @@ extern "C" void kmain() {
         x86::exception_load();
     }
 
-    x86::Dev::Timer::timer_init(); 
-
     Memory::Pmm::init_pmm();
     Memory::Vmm::init();
 
-    Util::klog("%s%s[Info] %s\n", BOLD, GREEN, RESET); 
+    Tests::run_scheduler_tests();
+
+    Tests::add_init_thread();
+    x86::Dev::Timer::timer_init();
 
     //Tests::run_all();
 

@@ -140,18 +140,6 @@ namespace Util {
         return static_cast<int>(str - buf);
     }
 
-    int atoi(std::string_view str) {
-        int value {};
-        std::size_t index = 0;
-
-        while (LibC::isdigit(str[index])) {
-            value = value * 10 + (str[index] - '0');
-            index += 1;
-        }
-
-        return value;
-    }
-    
     void klog(const char* fmt, ...) {
         char buf[1024];
         va_list args;
