@@ -11,7 +11,6 @@
 /// Some of linux's scheduling algo 
 /// SCHED_FIFO, SCHED_RR, SCHED_DEADLINE and SCHED_OTHER
 
-
 namespace x86::Proc::Scheduler {
     struct Schedule {
         std::uint8_t disable_counter {}; 
@@ -29,7 +28,7 @@ namespace x86::Proc::Scheduler {
         void unlock_scheduler(); 
         void block();
         void unblock(Thread::ThreadBlock* task);       
-        
+        Thread::ThreadBlock* get_current_thread(); 
         void add_ready_threads(Thread::ThreadBlock* thread);
         void switch_task(Thread::ThreadBlock& next_thread);
         void run_current(ArchIrq::IrqFrame* frame);

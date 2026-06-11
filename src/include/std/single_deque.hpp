@@ -2,6 +2,7 @@
 
 /// Credit: Qwinci
 
+#include <cstddef>
 namespace kstd {
     struct SingleNode {
         void* next;
@@ -47,7 +48,20 @@ namespace kstd {
                     }
             };
 
-            constexpr bool empty() {
+            constexpr std::size_t size() {
+                if (!head) {
+                    return 0;                
+                }
+
+                std::size_t cap = 0;
+                for (auto i = begin(); i != end(); ++i) {
+                    cap++;
+                }
+
+                return cap;
+            }
+
+            constexpr bool empty() const {
                 return head == nullptr && tail == nullptr;
             }
 
@@ -121,5 +135,22 @@ namespace kstd {
 
                 return tail_val;
             }
+
+            constexpr void remove(T* value) {
+                if (value == tail) {
+                    pop_tail();
+                    return;
+                } else if (value == head) {
+                    pop_head();
+                    return;
+                }
+
+                auto prev_value = head;
+                while ((prev_value->*Hook).next != value) {
+                    prev_value = static_cast<T*>((prev_value->*Hook).next);
+                }
+
+                (prev_value->*Hook).next = (value->*Hook).next;
+            } 
     };
 }

@@ -1,7 +1,9 @@
 #include "arch/x86-64/proc/process.hpp"
 #include "arch/x86-64/arch/arch_irq.hpp"
 #include "arch/x86-64/proc/thread.hpp"
+#include "limine/requests.hpp"
 #include "memory/vmm.hpp"
+#include <cstdint>
 
 namespace x86::Proc::Process {
     ProcessBlock::ProcessBlock(const char* name, FuncPtr entry) :
@@ -9,7 +11,6 @@ namespace x86::Proc::Process {
        // Util::IrqGaurd irq {};
         vaddr = Memory::Vmm::new_pagemap();
         Memory::Vmm::process_fill_kernel_entries(vaddr);
-        status = ProcStats::Ready;
     }
 
     ProcessBlock::ProcessBlock() {

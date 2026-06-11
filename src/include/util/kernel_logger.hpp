@@ -8,7 +8,7 @@
 
 namespace Util {
     int vsnprintf(char *buf, const char *fmt, va_list args);
-    
+    void klog_panic(const char* fmt);
     void klog(const char* fmt, ...);
     void klog_info(const char* fmt, ...);
 }

@@ -144,6 +144,11 @@ namespace x86::Proc::Scheduler {
         unlock_scheduler();
     }
 
+    Thread::ThreadBlock* Schedule::get_current_thread() {
+        Util::IrqGaurd irq_gaurd {};
+        return curr_thread;
+    }
+
     void Schedule::unblock(Thread::ThreadBlock* task) {
         lock_scheduler();
 

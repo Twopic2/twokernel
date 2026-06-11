@@ -25,8 +25,6 @@ namespace x86::Dev::Timer {
         Drivers::Pit::reset_tick();
         System::Irq::irq_unmask(0);
 
-        Util::klog("timer: PIT init (channel 0, mode 2, %u Hz)\n",
-                   static_cast<unsigned int>(Drivers::Pit::FREQUENCY));
         Util::klog("timer: IRQ0 unmasked\n");
     }
 

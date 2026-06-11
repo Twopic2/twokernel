@@ -5,6 +5,11 @@
 
 /// So exceptions also known as traps (UwU). Are program triggers 
 
+/**
+ *!For user-space processes: Delivers SIGSEGV signal to the thread
+ *!For kernel faults: Panics the system
+ */
+
 namespace x86::System::Idt {
     void x86_div_handler(ArchIrq::IrqFrame* frame);
     void x86_debug_handler(ArchIrq::IrqFrame* frame);

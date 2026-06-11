@@ -35,7 +35,7 @@ namespace x86::System::Gdt {
 
     struct [[gnu::packed]] TssSegments {
         std::uint32_t reserved0;
-        std::uint64_t rsp0; // Context switching usermode to kernelmode  
+        std::uint64_t rsp0; // Context switching 
         std::uint64_t rsp1;
         std::uint64_t rsp2;
         std::uint64_t reserved1;

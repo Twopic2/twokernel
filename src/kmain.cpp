@@ -1,4 +1,5 @@
 #include "arch/x86-64/dev/timer.hpp"
+#include "arch/x86-64/dev/keyboard.hpp"
 #include "arch/x86-64/proc/scheduler.hpp"
 #include "tests/ktest.hpp"
 #include "memory/pmm.hpp"
@@ -44,12 +45,12 @@ extern "C" void kmain() {
     Memory::Pmm::init_pmm();
     Memory::Vmm::init();
 
-    Tests::run_scheduler_tests();
+//    Tests::run_scheduler_tests();
 
-    Tests::add_init_thread();
     x86::Dev::Timer::timer_init();
+    x86::Dev::Keyboard::keyboard_init();
 
-    //Tests::run_all();
+    Tests::keyboard_irq_tests();
 
     // Once we finish we halt
     CxxRuntime::hcf();

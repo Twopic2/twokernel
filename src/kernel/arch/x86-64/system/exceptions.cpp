@@ -1,10 +1,15 @@
 #include "arch/x86-64/system/exceptions.hpp"
+#include "arch/x86-64/proc/scheduler.hpp"
 #include "util/kernel_logger.hpp"
 #include "util/ansi.hpp"
 #include <cstdint>
 
-using namespace Util::Ansi;
-
+/** 
+* ? Pagefaults notes:
+*! Demand Paging: Accessing the page that is not currently loaded in the memory (RAM).
+*! Invalid Memory Access, it occurs when a program tries to access memory beyond its allocated boundaries or not allocated.
+*! Process Violation: when a process tries to write to a read-only page or otherwise violates memory protection rules.
+*/
 namespace x86::System::Idt {
     static void halt_on_exception(const char* name, ArchIrq::IrqFrame* frame) {
         Util::klog("%s%s[#EXCEPTION] %s%s\n", BOLD, RED, name, RESET);
@@ -41,10 +46,20 @@ namespace x86::System::Idt {
     void x86_vmm_comm_exception_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("VMM communication (#VC)", frame); }
     void x86_security_exception_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("security exception (#SX)", frame); }
 
-    /// TODO: Make a special exception hanlder for pagefaults since this one is very important during paging
     void x86_pagefault_handler(ArchIrq::IrqFrame* frame) {
         std::uint64_t pg_address;
         asm volatile("mov %%cr2, %0" : "=r" (pg_address));
+
+        /* const bool present = frame->error & (1 << 0);
+        if (!present) {
+            auto curr_thread = Proc::Scheduler::g_scheduler.get_current_thread();
+        } 
+        
+        if (present) {
+        }
+        */
+
+        
 
         halt_on_exception("Page Fault (#PF)", frame);
     }

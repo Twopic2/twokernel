@@ -1,4 +1,7 @@
+#include "arch/x86-64/arch/cpu.hpp"
 #include "libc/ctype.h"
+#include "util/ansi.hpp"
+#include <cstdarg>
 #include <cstdint>
 #include <string_view>
 #include <util/kernel_logger.hpp>
@@ -147,5 +150,16 @@ namespace Util {
         int len = vsnprintf(buf, fmt, args);
         va_end(args);
         Drivers::g_tty->write_terminal(buf, len);
+    }
+
+    void klog_panic(const char *fmt) {
+        klog("%s%s[kernel]: PANIC%s\n", BOLD, RED, RESET);
+        klog("%s", fmt);
+        
+        Cpu::cli();
+
+        while (true) {
+            asm volatile("hlt");
+        }
     }
 }

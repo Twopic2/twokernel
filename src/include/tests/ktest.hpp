@@ -32,6 +32,8 @@ namespace Tests {
     void run_scheduler_tests();
     void add_init_thread(); 
     void deque_tests();
+    void keyboard_buffer_tests();
+    void keyboard_irq_tests();
 
     inline void run_all() {
         run_pmm_tests();

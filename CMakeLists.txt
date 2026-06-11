@@ -105,9 +105,12 @@ set(KERNEL_SOURCES
     src/kernel/tests/vmm_tests.cpp
     src/kernel/tests/irq_tests.cpp
     src/kernel/tests/schedule_tests.cpp
-    src/kernel/lib/circularbuffer.cpp
+    src/kernel/tests/deque_tests.cpp
+    src/kernel/tests/keyboard_buffer_tests.cpp
+    src/kernel/tests/keyboard_irq_tests.cpp
     src/kernel/arch/x86-64/dev/keyboard.cpp
     src/kernel/drivers/pit.cpp
+    src/kernel/drivers/ps2.cpp
 )
 
 set(FLANTERM_SOURCES
@@ -120,7 +123,9 @@ set(LIBC_SOURCES
     src/libc/ctype.cpp
 )
 
-add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCES})
+add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCES}
+    src/include/drivers/ps2.hpp
+    src/include/arch/x86-64/arch/event.hpp)
 
 if(CMAKE_HOST_APPLE)
     target_compile_definitions(twokernel.elf PRIVATE TWOKERNEL_HOST_MACOS)
