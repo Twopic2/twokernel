@@ -27,12 +27,9 @@ namespace Drivers::Ps2 {
     inline constexpr std::uint8_t DATA_PORT = 0x60;
     inline constexpr std::uint8_t STATUS_PORT = 0x64;
     inline constexpr std::uint8_t CMD_PORT = 0x64;
-    // Device commands, sent to the keyboard through write_data
     inline constexpr std::uint8_t SCANNING_BYTE = 0xF4;
     inline constexpr std::uint8_t DISABLE_SCANNING = 0xF5;
     inline constexpr std::uint8_t RESEND = 0xFE;
-
-    // Device replies, arriving through on_recieve; RESEND doubles as the nack
     inline constexpr std::uint8_t ACK = 0xFA;
     inline constexpr std::uint8_t DISABLE_PORT1 = 0xAD;
     inline constexpr std::uint8_t ENABLE_PORT1 = 0xAE;
