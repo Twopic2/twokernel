@@ -1,6 +1,7 @@
 #include <tests/ktest.hpp>
 #include <arch/x86-64/dev/keyboard.hpp>
 #include <arch/x86-64/arch/event.hpp>
+#include <arch/x86-64/arch/io.hpp>
 #include <arch/x86-64/system/irq.hpp>
 
 namespace Tests {
@@ -34,6 +35,11 @@ namespace Tests {
         using Drivers::Ps2::State;
 
         auto& kb = x86::Dev::Keyboard::device();
+
+        // The nack path resends last_data to the live keyboard, and its ack
+        // would race these assertions through the ISR; keep IRQ1 quiet for
+        // the whole suite and swallow the provoked replies at the end
+        x86::System::Irq::irq_mask(1);
 
         // ── normalized device state ───────────────────────────────────────────
         {
@@ -122,6 +128,28 @@ namespace Tests {
             KTEST_ASSERT(kb.data.is_empty(), "buffer is empty after draining the word");
         }
 
+        {
+            normalize(kb);
+
+            // A real nack below the limit resends last_sent to the device and
+            // the ack would race these assertions, so start one short of the
+            // limit: this path goes straight to the controller, no device I/O
+            kb.nack_count = Drivers::Ps2::MAX_RETRY - 1;
+            kb.on_recieve(0xFE);
+            KTEST_ASSERT(kb.signal == PS2Ack::Error,
+                         "nack at the retry limit escalates to Error");
+            KTEST_ASSERT(kb.data.is_empty(), "nack traffic never reaches the buffer");
+
+            // The escalation disabled port 1; bring it back for the rest of boot
+            kb.write_cmd(Drivers::Ps2::ENABLE_PORT1);
+            kb.nack_count = 0;
+
+            kb.nack_count = 2;
+            kb.on_recieve(0xFA);
+            KTEST_ASSERT(kb.signal == PS2Ack::Ack, "ack after nacks sets signal back to Ack");
+            KTEST_ASSERT(kb.nack_count == 0,       "ack ends the retry streak");
+        }
+
         // ── IRQ1 routes through the dispatcher into g_keyboard ────────────────
         {
             normalize(kb);
@@ -132,6 +160,13 @@ namespace Tests {
                          "dispatch on line 1 feeds isr_keyboard exactly one byte");
             normalize(kb);
         }
+
+        // Drain replies the suite provoked out of the device, then let
+        // real keystrokes interrupt again
+        while (x86::IO::inb(Drivers::Ps2::STATUS_PORT) & 1) {
+            x86::IO::inb(Drivers::Ps2::DATA_PORT);
+        }
+        x86::System::Irq::irq_unmask(1);
 
         KTest::summary("Keyboard IRQ1");
     }

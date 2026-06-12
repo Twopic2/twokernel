@@ -18,7 +18,7 @@ namespace x86::Dev::Keyboard {
         Util::klog("%s%s[init] Keyboard %s\n", BOLD, RED, RESET);
         g_keyboard.ps2_keyboard_init();
         System::Irq::irq_unmask(1);
-        Util::klog("timer: IRQ1 unmasked\n");
+        Util::klog("keyboard: IRQ1 unmasked\n");
     }
 
     Drivers::Ps2::Ps2Keyboard& device() {
@@ -26,6 +26,6 @@ namespace x86::Dev::Keyboard {
     }
 
     void reset() {
-        g_keyboard.write_cmd(0xFE);
+        g_keyboard.write_cmd(Drivers::Ps2::CPU_RESET);
     }
 }

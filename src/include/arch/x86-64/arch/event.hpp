@@ -110,12 +110,6 @@ namespace Arch {
         Delete       = 0xD3,
     };
 
-    enum class ModifierKey : std::uint8_t {
-        CRTMASK,
-        ALTMASK,
-        SHIFTMASK
-    };
-
     inline constexpr bool ps2_is_release(std::uint8_t byte) {
         return byte & 0x80;
     }

@@ -11,12 +11,20 @@ namespace Drivers::Ps2 {
 
     void Ps2Keyboard::on_recieve(std::uint8_t byte) {
         switch (byte) {
-            case 0xFA:
+            case ACK:
                 signal = PS2Ack::Ack;
+                nack_count = 0;
                 return;
-            case 0xFE:
+            case RESEND:
                 signal = PS2Ack::Nack;
-                return;    
+                if (++nack_count >= MAX_RETRY) {
+                    nack_count = 0;
+                    signal = PS2Ack::Error;
+                    write_cmd(DISABLE_PORT1);
+                    return;
+                }
+                write_data(last_data);
+                return;
             case 0xE0:
                 state_machine = State::E0;
                 return;
@@ -45,6 +53,7 @@ namespace Drivers::Ps2 {
     }
     
     void Ps2Keyboard::write_data(std::uint8_t byte) {
+        last_data = byte;
         x86::IO::outb(DATA_PORT, byte);
     }
 
