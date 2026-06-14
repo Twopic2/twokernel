@@ -4,6 +4,7 @@
 // The Programmable Interval Timer (PIT) chip (Intel 8253/8254) basically consists of an 
 // oscillator, a prescaler and 3 independent frequency dividers. 
 
+#include <cstddef>
 #include <cstdint>
 #include <arch/x86-64/arch/io.hpp>
 
