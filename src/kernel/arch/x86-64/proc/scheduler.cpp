@@ -76,7 +76,6 @@ namespace x86::Proc::Scheduler {
                 curr_thread->ticks_left = Thread::TIME_SLICE_MS;
                 Schedule::schedule();
             }
-            Schedule::schedule();
         }
 
         unlock_scheduler();

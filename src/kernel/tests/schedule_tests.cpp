@@ -3,6 +3,7 @@
 #include <arch/x86-64/proc/scheduler.hpp>
 #include <arch/x86-64/proc/thread.hpp>
 #include <arch/x86-64/system/gdt.hpp>
+#include <drivers/pit.hpp>
 #include <cstdint>
 
 /**  
@@ -32,8 +33,10 @@ namespace Tests {
 
         auto reset_sched = [] {
             g_scheduler.ready_threads.clear_all();
+            g_scheduler.sleeping_threads.clear_all();
             g_scheduler.curr_thread          = nullptr;
             g_scheduler.task_switch_counter  = 0;
+            
             g_scheduler.disable_counter      = 0;
             g_scheduler.task_switch_postponed = false;
         };
@@ -127,6 +130,9 @@ namespace Tests {
             KTEST_ASSERT(g_scheduler.curr_thread == &a,         "the only ready thread keeps running");
         }
 
+        // ── Rotation happens once per quantum, not once per tick ─────────────
+        // With two ready threads, a holds the CPU until its quantum drains; the
+        // expiry tick refills a's quantum and rotates to b.
         {
             reset_sched();
             Thread::ThreadBlock a {}; a.m_name = "a";
@@ -134,27 +140,31 @@ namespace Tests {
 
             g_scheduler.add_ready_threads(&a);
             g_scheduler.add_ready_threads(&b);
+            g_scheduler.schedule();
+            KTEST_ASSERT(g_scheduler.curr_thread == &a, "a runs first");
+
             x86::ArchIrq::IrqFrame frame {};
 
-            for (std::uint64_t i = 0; i < 21; ++i) {
+            // Ticks inside the quantum decrement the counter but never rotate.
+            for (std::uint64_t i = 0; i < Thread::TIME_SLICE_MS - 1; ++i) {
                 g_scheduler.pit_irq_handler(&frame);
-
-                if (i == 0) {
-                    KTEST_ASSERT(g_scheduler.get_current_thread() == &a, "first thead should be A");
-                } else if (i == 1) {
-                    KTEST_ASSERT(g_scheduler.get_current_thread() == &b, "first thead should be B"); 
-                }
+                KTEST_ASSERT(g_scheduler.curr_thread == &a,
+                             "a keeps the CPU for the whole quantum");
             }
+            KTEST_ASSERT(a.ticks_left == 1, "a's quantum is down to its final tick");
 
+            // The expiry tick refills a's quantum and rotates to b.
             g_scheduler.pit_irq_handler(&frame);
-            KTEST_ASSERT(b.ticks_left == Thread::TIME_SLICE_MS, "reset thread B's timer");
-            KTEST_ASSERT(&b == g_scheduler.get_current_thread(), "Last thread");        
+            KTEST_ASSERT(g_scheduler.curr_thread == &b, "quantum expiry rotates to b");
+            KTEST_ASSERT(a.ticks_left == Thread::TIME_SLICE_MS,
+                         "the outgoing thread's quantum is refilled on expiry");
         }
 
-        // ── Every tick rotates and restores the INCOMING thread's registers ──
-        // The handler reschedules on every tick, so each tick saves the outgoing
-        // thread's live frame into its TCB and loads the incoming thread's saved
-        // frame back into *frame for the ISR epilogue / iretq.
+        // ── On rotation the outgoing frame is saved and the incoming restored ──
+        // Rotation only fires on quantum expiry, so each test drains a full
+        // quantum; the expiry tick saves the outgoing thread's live frame into
+        // its TCB and loads the incoming thread's saved frame into *frame for
+        // the ISR epilogue / iretq.
         {
             reset_sched();
             Thread::ThreadBlock a {}; a.m_name = "a";
@@ -174,26 +184,28 @@ namespace Tests {
             frame.rip = 0xA0;
             frame.rax = 0xAA;
 
-            // One tick rotates a -> b: a's live frame is saved, b's saved frame
-            // is restored into *frame.
-            g_scheduler.pit_irq_handler(&frame);
-            KTEST_ASSERT(g_scheduler.curr_thread == &b, "one tick rotates to b");
+            // Drain a's quantum: rotation a -> b lands on the final tick.
+            for (std::uint64_t i = 0; i < Thread::TIME_SLICE_MS; ++i) {
+                g_scheduler.pit_irq_handler(&frame);
+            }
+            KTEST_ASSERT(g_scheduler.curr_thread == &b, "quantum expiry rotates a -> b");
             KTEST_ASSERT(a.registers.rip == 0xA0 && a.registers.rax == 0xAA,
                          "outgoing thread a's live registers are saved into its TCB");
             KTEST_ASSERT(frame.rip == 0xB0 && frame.rax == 0xBB,
                          "incoming thread b's saved registers are restored into the frame");
 
-            // The next tick rotates b -> a: b is saved, a's own registers come
-            // back into the frame.
-            g_scheduler.pit_irq_handler(&frame);
-            KTEST_ASSERT(g_scheduler.curr_thread == &a, "the next tick rotates back to a");
+            // Drain b's quantum: rotation b -> a, and a's own frame comes back.
+            for (std::uint64_t i = 0; i < Thread::TIME_SLICE_MS; ++i) {
+                g_scheduler.pit_irq_handler(&frame);
+            }
+            KTEST_ASSERT(g_scheduler.curr_thread == &a, "the next quantum rotates back to a");
             KTEST_ASSERT(b.registers.rip == 0xB0 && b.registers.rax == 0xBB,
                          "outgoing thread b's live registers are saved into its TCB");
             KTEST_ASSERT(frame.rip == 0xA0 && frame.rax == 0xAA,
                          "incoming thread a's saved registers are restored into the frame");
         }
 
-        // ── Every tick rotates the thread AND moves TSS.rsp0 with it ──────────
+        // ── On rotation TSS.rsp0 moves to the incoming thread's stack ─────────
         {
             reset_sched();
             Thread::ThreadBlock a {}; a.m_name = "a";
@@ -208,18 +220,143 @@ namespace Tests {
 
             x86::ArchIrq::IrqFrame frame {};
 
-            // Each tick rotates to the next thread and moves TSS.rsp0 with it.
+            // A mid-quantum tick leaves the running thread and TSS.rsp0 in place.
             g_scheduler.pit_irq_handler(&frame);
-            KTEST_ASSERT(g_scheduler.curr_thread == &b, "one tick rotates to b");
+            KTEST_ASSERT(g_scheduler.curr_thread == &a, "a still runs mid-quantum");
             KTEST_ASSERT(a.ticks_left == Thread::TIME_SLICE_MS - 1,
                          "the running thread's quantum ticks down by one");
+            KTEST_ASSERT(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(a.rsp0),
+                         "TSS.rsp0 stays on a mid-quantum");
+
+            // Finish the quantum: the rotation to b moves TSS.rsp0 with it.
+            for (std::uint64_t i = 0; i < Thread::TIME_SLICE_MS - 1; ++i) {
+                g_scheduler.pit_irq_handler(&frame);
+            }
+            KTEST_ASSERT(g_scheduler.curr_thread == &b, "quantum expiry rotates to b");
             KTEST_ASSERT(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(b.rsp0),
                          "TSS.rsp0 follows the switch to b");
+        }
 
+        // ── yield() hands the CPU to the next ready thread ───────────────────
+        // a runs (curr_thread, NOT parked in the ready queue) and b waits. A
+        // yield should requeue a as Ready and resume b.
+        {
+            reset_sched();
+            Thread::ThreadBlock a {}; a.m_name = "a";
+            Thread::ThreadBlock b {}; b.m_name = "b";
+
+            g_scheduler.curr_thread = &a;
+            a.state = Thread::ThreadState::Running;
+            b.state = Thread::ThreadState::Ready;
+            g_scheduler.ready_threads.push_tail(&b);
+
+            g_scheduler.yield();
+            KTEST_ASSERT(g_scheduler.curr_thread == &b,
+                         "yield() hands the CPU to the next ready thread");
+            KTEST_ASSERT(b.state == Thread::ThreadState::Running,
+                         "the resumed thread is marked Running");
+            KTEST_ASSERT(a.state == Thread::ThreadState::Ready,
+                         "the yielding thread is marked Ready");
+            KTEST_ASSERT(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(b.rsp0),
+                         "TSS.rsp0 follows the yield over to b");
+
+            // The lock/postpone dance must net out: yield returns fully unlocked.
+            KTEST_ASSERT(g_scheduler.task_switch_counter == 0 && g_scheduler.disable_counter == 0,
+                         "yield() leaves the scheduler unlocked");
+            KTEST_ASSERT(!g_scheduler.task_switch_postponed,
+                         "yield() consumes the postponed switch it queued");
+        }
+
+        // ── yield() with nothing else ready keeps the caller running ─────────
+        {
+            reset_sched();
+            Thread::ThreadBlock a {}; a.m_name = "a";
+
+            g_scheduler.curr_thread = &a;
+            a.state = Thread::ThreadState::Running;
+
+            g_scheduler.yield();
+            KTEST_ASSERT(g_scheduler.curr_thread == &a,
+                         "yield() with no other ready thread keeps the caller running");
+            KTEST_ASSERT(a.state == Thread::ThreadState::Running,
+                         "the sole thread stays Running after yield()");
+        }
+
+        // ── sleep() parks the caller on the sleeping queue ───────────────────
+        // The guard compares the requested ticks against the current PIT time,
+        // so we push the clock forward to let the request through.
+        {
+            reset_sched();
+            const auto saved_clocks = Drivers::Pit::pit_clocks;
+            Drivers::Pit::pit_clocks = 2 * Drivers::Pit::HZ;   // now() == 2000 ms
+
+            Thread::ThreadBlock a {}; a.m_name = "a";
+            g_scheduler.curr_thread = &a;
+            a.state = Thread::ThreadState::Running;
+
+            g_scheduler.sleep(50);
+            KTEST_ASSERT(a.state == Thread::ThreadState::Sleep,
+                         "sleep() marks the caller Sleeping");
+            KTEST_ASSERT(a.ticks_left == 50,
+                         "sleep() records the requested tick count");
+            KTEST_ASSERT(!g_scheduler.sleeping_threads.empty(),
+                         "the sleeper is parked on the sleeping queue");
+            // NOTE: sleep() does not call schedule(), so the sleeper is still the
+            // current thread and keeps running until the next PIT tick rotates
+            // it out. Worth revisiting if you want sleep() to yield immediately.
+            KTEST_ASSERT(g_scheduler.curr_thread == &a,
+                         "sleep() currently does NOT switch away from the caller");
+
+            Drivers::Pit::pit_clocks = saved_clocks;
+        }
+
+        // ── sleep() request is dropped when ticks > now (current guard) ──────
+        // With the clock at 0, `time > now` is true for any positive sleep, so
+        // the guard bails early. This pins the present behaviour of an
+        // inverted-looking guard — flip the assertions if you fix it.
+        {
+            reset_sched();
+            const auto saved_clocks = Drivers::Pit::pit_clocks;
+            Drivers::Pit::pit_clocks = 0;                      // now() == 0 ms
+
+            Thread::ThreadBlock a {}; a.m_name = "a";
+            g_scheduler.curr_thread = &a;
+            a.state = Thread::ThreadState::Running;
+
+            g_scheduler.sleep(50);                             // 50 > 0 -> early return
+            KTEST_ASSERT(a.state == Thread::ThreadState::Running,
+                         "sleep(t) with t > now is dropped, caller stays Running");
+            KTEST_ASSERT(g_scheduler.sleeping_threads.empty(),
+                         "nothing is parked when the sleep guard bails");
+
+            Drivers::Pit::pit_clocks = saved_clocks;
+        }
+
+        // ── PIT ticks drain a sleeper's timer and wake it ────────────────────
+        // A runner keeps the scheduler live; the sleeper's ticks_left counts
+        // down one per tick and the thread is released when it hits zero.
+        {
+            reset_sched();
+            Thread::ThreadBlock runner  {}; runner.m_name  = "runner";
+            Thread::ThreadBlock sleeper {}; sleeper.m_name = "sleeper";
+
+            g_scheduler.add_ready_threads(&runner);            // curr = runner
+
+            sleeper.state      = Thread::ThreadState::Sleep;
+            sleeper.ticks_left = 3;
+            g_scheduler.sleeping_threads.push_tail(&sleeper);
+
+            x86::ArchIrq::IrqFrame frame {};
             g_scheduler.pit_irq_handler(&frame);
-            KTEST_ASSERT(g_scheduler.curr_thread == &a, "the next tick rotates back to a");
-            KTEST_ASSERT(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(a.rsp0),
-                         "TSS.rsp0 follows the switch back to a");
+            KTEST_ASSERT(sleeper.ticks_left == 2,
+                         "one PIT tick decrements the sleeper's remaining time");
+
+            g_scheduler.pit_irq_handler(&frame);               // 2 -> 1
+            g_scheduler.pit_irq_handler(&frame);               // 1 -> 0, wakes
+            KTEST_ASSERT(sleeper.state != Thread::ThreadState::Sleep,
+                         "draining the sleep timer wakes the thread");
+            KTEST_ASSERT(!g_scheduler.ready_threads.empty(),
+                         "the woken sleeper is back on the ready queue");
         }
 
         reset_sched();
