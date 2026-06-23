@@ -24,13 +24,19 @@ namespace x86::Proc::Process {
     READY: The process is runnable, and can be executed.
     RUNNING: The process is currently running.
     DEAD: The process has finished executing, and can have its resources cleaned up. 
+
+    Blocked: In the blocked state, a process has performed some kind
+    of operation that makes it not ready to run until some other event
+    takes place. A common example: when a process initiates an I/O
+    request to a disk, it becomes blocked and thus some other process
+    can use the processor.
     */
 
     enum class ProcStats : std::uint8_t {
         Ready,
         Running,
         Sleep,
-        Dead,
+        Zombie,
     };
 
     using FuncPtr = void(*)(void*);
@@ -39,7 +45,7 @@ namespace x86::Proc::Process {
     struct ProcessBlock {
         kstd::SingleDeque<Thread::ThreadBlock, &Thread::ThreadBlock::proc_hook> threads;
         Thread::ThreadBlock* curr_thread {}; 
-        ProcessBlock* next {};
+        ProcessBlock* parent {};
         Memory::Vmm::VAddressSpace vaddr;
         
         ProcStats status; 

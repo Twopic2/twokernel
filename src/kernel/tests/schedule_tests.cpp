@@ -33,7 +33,6 @@ namespace Tests {
         auto reset_sched = [] {
             g_scheduler.ready_threads.clear_all();
             g_scheduler.curr_thread          = nullptr;
-            g_scheduler.curr_ready_thread    = nullptr;
             g_scheduler.task_switch_counter  = 0;
             g_scheduler.disable_counter      = 0;
             g_scheduler.task_switch_postponed = false;

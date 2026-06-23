@@ -38,17 +38,17 @@ namespace x86::Proc::Scheduler {
             ready_threads.push_head(thread);
             System::Gdt::tss.rsp0 = reinterpret_cast<std::uint64_t>(thread->rsp0);
             
-            curr_ready_thread = thread;
             curr_thread = thread;
 
             return;
         }
 
+        thread->state = Thread::ThreadState::Ready;
         ready_threads.push_tail(thread);
     }
 
     void Schedule::pit_irq_handler(ArchIrq::IrqFrame* frame) {
-        if (!curr_thread && !curr_ready_thread) {
+        if (!curr_thread) {
             return;
         }
 
@@ -90,23 +90,20 @@ namespace x86::Proc::Scheduler {
             return;
         }
 
-        if (!ready_threads.empty() && !curr_ready_thread) {
-            curr_ready_thread = ready_threads.pop_head();
-            curr_ready_thread->state = Thread::ThreadState::Running;
-            switch_task(*curr_ready_thread);
-        } else if (curr_ready_thread) {
-            curr_ready_thread->state = Thread::ThreadState::Ready;
-            ready_threads.push_tail(curr_ready_thread);
-
-            curr_ready_thread = ready_threads.pop_head();
-            curr_ready_thread->state = Thread::ThreadState::Running;
-            switch_task(*curr_ready_thread);
+        if (!ready_threads.empty() && !curr_thread) {
+            curr_thread = ready_threads.pop_head();
+            switch_task(*curr_thread);
         } 
+
+        curr_thread = ready_threads.pop_head();
+
+        curr_thread->state = Thread::ThreadState::Running;
+        switch_task(*curr_thread);
     }
 
     void Schedule::switch_task(Thread::ThreadBlock& next_thread) {
         //Util::dump_registers("current thread before context switch", curr_thread->registers);
-
+        Schedule::add_ready_threads(curr_thread);
         System::Gdt::tss.rsp0 = reinterpret_cast<std::uint64_t>(next_thread.rsp0);
 
         //if (next_thread.m_process != curr_thread->m_process) {}

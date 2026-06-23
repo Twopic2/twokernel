@@ -36,6 +36,6 @@ namespace x86::Proc::Process {
 
     void ProcessBlock::exit() {
         //Util::IrqGaurd irq {};
-        status = ProcStats::Dead;
+        status = ProcStats::Zombie;
     }
 }

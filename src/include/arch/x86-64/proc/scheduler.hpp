@@ -25,9 +25,6 @@ namespace x86::Proc::Scheduler {
 
         kstd::SingleDeque<Thread::ThreadBlock, &Thread::ThreadBlock::hook> sleeping_threads;
         kstd::SingleDeque<Thread::ThreadBlock, &Thread::ThreadBlock::hook> ready_threads;
-
-        // Why is there an extra pointer here
-        Thread::ThreadBlock* curr_ready_thread;
         Thread::ThreadBlock* curr_thread;
 
         void lock_scheduler();
