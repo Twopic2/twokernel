@@ -28,12 +28,13 @@ namespace x86::Proc::Process { struct ProcessBlock; }
 namespace x86::Proc::Thread {
     inline constexpr std::uint64_t TIME_SLICE_MS = 10;
     inline std::uint64_t total_tid {};
+    inline constexpr auto SET_RFLAGS = 0x202;
 
     enum class ThreadState : std::uint8_t {
         Ready,
         Running,
 		Sleep,
-        Dead
+        Zombie
     };
 
     using FuncPtr = void (*)(void*);   

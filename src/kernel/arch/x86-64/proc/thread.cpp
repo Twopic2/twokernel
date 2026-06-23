@@ -1,3 +1,4 @@
+#include "arch/x86-64/arch/arch_irq.hpp"
 #include "arch/x86-64/system/gdt.hpp"
 #include "arch/x86-64/system/idt.hpp"
 #include "limine/requests.hpp"
@@ -15,7 +16,7 @@ namespace x86::Proc::Thread {
         state = ThreadState::Ready;
         registers.cs = System::Idt::code;
         registers.ss = System::Idt::data;
-        registers.rflags = 0x202;
+        registers.rflags = SET_RFLAGS;
         registers.rip = reinterpret_cast<std::uint64_t>(entry);
 
         total_tid++;
@@ -29,7 +30,7 @@ namespace x86::Proc::Thread {
         state = ThreadState::Ready;
         registers.cs = System::Idt::code;
         registers.ss = System::Idt::data;
-        registers.rflags = 0x202;
+        registers.rflags = SET_RFLAGS;
 
         total_tid++;
         thread_id = total_tid;
@@ -51,6 +52,7 @@ namespace x86::Proc::Thread {
 
     void ThreadBlock::exit() {
         Util::IrqGaurd irq {};
+        state = ThreadState::Zombie;
         Memory::Pmm::free(pa, 4);
     }
 }

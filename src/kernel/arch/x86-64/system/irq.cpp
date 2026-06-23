@@ -95,7 +95,9 @@ namespace x86::System::Irq {
                 h(frame);
             } else {
                 Util::klog("unhandled CPU exception %u\n", vector);
-                for (;;) __asm__ volatile ("cli; hlt");
+                for (;;) {
+                    asm volatile ("cli; hlt");
+                }
             }
         } else if (vector < 48) { // Hardware IRQ
             auto new_vector = vector - 32;

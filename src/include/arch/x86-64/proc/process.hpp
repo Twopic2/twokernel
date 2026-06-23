@@ -35,12 +35,13 @@ namespace x86::Proc::Process {
 
     using FuncPtr = void(*)(void*);
     
+    inline std::uint16_t total_pid = 0;
     struct ProcessBlock {
         kstd::SingleDeque<Thread::ThreadBlock, &Thread::ThreadBlock::proc_hook> threads;
         Thread::ThreadBlock* curr_thread {}; 
         ProcessBlock* next {};
         Memory::Vmm::VAddressSpace vaddr;
-        ArchIrq::IrqFrame registers {};
+        
         ProcStats status; 
         FuncPtr m_entry;
         const char* m_name;

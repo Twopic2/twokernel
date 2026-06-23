@@ -10,9 +10,8 @@
 
 namespace Drivers::Pit {
     inline constexpr std::size_t HZ = 1193182;
-    inline constexpr std::size_t FREQUENCY = 1000;
-    inline constexpr std::uint16_t RELOAD  = HZ / FREQUENCY;   
-    
+    inline constexpr std::size_t FREQUENCY = 1000;                                                                                              
+    inline constexpr std::uint16_t RELOAD = HZ / FREQUENCY;
     // Channels
     inline constexpr std::uint8_t CHANNEL0 = 0x40; 
     inline constexpr std::uint8_t CHANNEL1 = 0x41;

@@ -11,6 +11,8 @@ namespace x86::Proc::Process {
        // Util::IrqGaurd irq {};
         vaddr = Memory::Vmm::new_pagemap();
         Memory::Vmm::process_fill_kernel_entries(vaddr);
+        total_pid++;
+        pid = total_pid;
     }
 
     ProcessBlock::ProcessBlock() {
@@ -18,6 +20,8 @@ namespace x86::Proc::Process {
         vaddr = Memory::Vmm::new_pagemap();
         Memory::Vmm::process_fill_kernel_entries(vaddr);
         status = ProcStats::Ready;
+        total_pid++;
+        pid = total_pid;
     }
 
     void ProcessBlock::add_thread(Thread::ThreadBlock* thread) {

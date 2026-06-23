@@ -71,13 +71,17 @@ namespace x86::Proc::Scheduler {
         }
 
         if (curr_thread->ticks_left != 0) {
-            if (--curr_thread->ticks_left == 0) {
+            curr_thread->ticks_left -= 1; // Quantum Time ticker
+            if (curr_thread->ticks_left == 0) {
                 curr_thread->ticks_left = Thread::TIME_SLICE_MS;
                 Schedule::schedule();
             }
-        } 
+            Schedule::schedule();
+        }
 
         unlock_scheduler();
+
+        *frame = curr_thread->registers;
     }
 
     void Schedule::schedule() {
@@ -101,9 +105,14 @@ namespace x86::Proc::Scheduler {
     }
 
     void Schedule::switch_task(Thread::ThreadBlock& next_thread) {
+        //Util::dump_registers("current thread before context switch", curr_thread->registers);
+
         System::Gdt::tss.rsp0 = reinterpret_cast<std::uint64_t>(next_thread.rsp0);
 
+        //if (next_thread.m_process != curr_thread->m_process) {}
+
         curr_thread = &next_thread;
+      //  Util::dump_registers("next thread after context switch", next_thread.registers);
     }
 
     void Schedule::sleep(std::uint64_t time) {

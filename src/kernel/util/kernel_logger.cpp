@@ -1,3 +1,4 @@
+#include "arch/x86-64/arch/arch_irq.hpp"
 #include "arch/x86-64/arch/cpu.hpp"
 #include "libc/ctype.h"
 #include "util/ansi.hpp"
@@ -141,6 +142,16 @@ namespace Util {
 
         *str = '\0';
         return static_cast<int>(str - buf);
+    }
+
+    void dump_registers(const char* label, const x86::ArchIrq::IrqFrame& r) {
+        klog("%s registers:\n", label);
+        klog("  rax=%llx rbx=%llx rcx=%llx rdx=%llx\n", r.rax, r.rbx, r.rcx, r.rdx);
+        klog("  rsi=%llx rdi=%llx rbp=%llx rsp=%llx\n", r.rsi, r.rdi, r.rbp, r.rsp);
+        klog("  r8 =%llx r9 =%llx r10=%llx r11=%llx\n", r.r8, r.r9, r.r10, r.r11);
+        klog("  r12=%llx r13=%llx r14=%llx r15=%llx\n", r.r12, r.r13, r.r14, r.r15);
+        klog("  rip=%llx cs=%llx ss=%llx rflags=%llx\n", r.rip, r.cs, r.ss, r.rflags);
+        klog("  error=%llx\n", r.error);
     }
 
     void klog(const char* fmt, ...) {

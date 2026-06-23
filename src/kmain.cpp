@@ -45,12 +45,13 @@ extern "C" void kmain() {
     Memory::Pmm::init_pmm();
     Memory::Vmm::init();
 
-//    Tests::run_scheduler_tests();
+    Tests::run_scheduler_tests();
 
     x86::Dev::Timer::timer_init();
+
     x86::Dev::Keyboard::keyboard_init();
 
-    Tests::keyboard_irq_tests();
+    //Tests::keyboard_irq_tests();
 
     // Once we finish we halt
     CxxRuntime::hcf();

@@ -128,7 +128,73 @@ namespace Tests {
             KTEST_ASSERT(g_scheduler.curr_thread == &a,         "the only ready thread keeps running");
         }
 
-        // ── PIT expiry rotates the thread AND moves TSS.rsp0 with it ──────────
+        {
+            reset_sched();
+            Thread::ThreadBlock a {}; a.m_name = "a";
+            Thread::ThreadBlock b {}; b.m_name = "b";
+
+            g_scheduler.add_ready_threads(&a);
+            g_scheduler.add_ready_threads(&b);
+            x86::ArchIrq::IrqFrame frame {};
+
+            for (std::uint64_t i = 0; i < 21; ++i) {
+                g_scheduler.pit_irq_handler(&frame);
+
+                if (i == 0) {
+                    KTEST_ASSERT(g_scheduler.get_current_thread() == &a, "first thead should be A");
+                } else if (i == 1) {
+                    KTEST_ASSERT(g_scheduler.get_current_thread() == &b, "first thead should be B"); 
+                }
+            }
+
+            g_scheduler.pit_irq_handler(&frame);
+            KTEST_ASSERT(b.ticks_left == Thread::TIME_SLICE_MS, "reset thread B's timer");
+            KTEST_ASSERT(&b == g_scheduler.get_current_thread(), "Last thread");        
+        }
+
+        // ── Every tick rotates and restores the INCOMING thread's registers ──
+        // The handler reschedules on every tick, so each tick saves the outgoing
+        // thread's live frame into its TCB and loads the incoming thread's saved
+        // frame back into *frame for the ISR epilogue / iretq.
+        {
+            reset_sched();
+            Thread::ThreadBlock a {}; a.m_name = "a";
+            Thread::ThreadBlock b {}; b.m_name = "b";
+
+            // b waits, so its context lives in its TCB; a runs, so its live
+            // context lives in the frame (the handler reads it from there).
+            b.registers.rip = 0xB0;
+            b.registers.rax = 0xBB;
+
+            g_scheduler.add_ready_threads(&a);
+            g_scheduler.add_ready_threads(&b);
+            g_scheduler.schedule();
+            KTEST_ASSERT(g_scheduler.curr_thread == &a, "a runs first");
+
+            x86::ArchIrq::IrqFrame frame {};
+            frame.rip = 0xA0;
+            frame.rax = 0xAA;
+
+            // One tick rotates a -> b: a's live frame is saved, b's saved frame
+            // is restored into *frame.
+            g_scheduler.pit_irq_handler(&frame);
+            KTEST_ASSERT(g_scheduler.curr_thread == &b, "one tick rotates to b");
+            KTEST_ASSERT(a.registers.rip == 0xA0 && a.registers.rax == 0xAA,
+                         "outgoing thread a's live registers are saved into its TCB");
+            KTEST_ASSERT(frame.rip == 0xB0 && frame.rax == 0xBB,
+                         "incoming thread b's saved registers are restored into the frame");
+
+            // The next tick rotates b -> a: b is saved, a's own registers come
+            // back into the frame.
+            g_scheduler.pit_irq_handler(&frame);
+            KTEST_ASSERT(g_scheduler.curr_thread == &a, "the next tick rotates back to a");
+            KTEST_ASSERT(b.registers.rip == 0xB0 && b.registers.rax == 0xBB,
+                         "outgoing thread b's live registers are saved into its TCB");
+            KTEST_ASSERT(frame.rip == 0xA0 && frame.rax == 0xAA,
+                         "incoming thread a's saved registers are restored into the frame");
+        }
+
+        // ── Every tick rotates the thread AND moves TSS.rsp0 with it ──────────
         {
             reset_sched();
             Thread::ThreadBlock a {}; a.m_name = "a";
@@ -137,32 +203,26 @@ namespace Tests {
             g_scheduler.add_ready_threads(&a);
             g_scheduler.add_ready_threads(&b);
             g_scheduler.schedule();
-            KTEST_ASSERT(g_scheduler.curr_thread == &a, "current thread is a at start of slice");
+            KTEST_ASSERT(g_scheduler.curr_thread == &a, "current thread is a at start");
             KTEST_ASSERT(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(a.rsp0),
-                         "TSS.rsp0 = a.rsp0 at start of slice");
+                         "TSS.rsp0 = a.rsp0 while a runs");
 
             x86::ArchIrq::IrqFrame frame {};
-            // TIME_SLICE_MS - 1 ticks bring a's quantum to 1 without expiring.
-            for (std::uint64_t i = 0; i < Thread::TIME_SLICE_MS - 1; ++i) {
-                g_scheduler.pit_irq_handler(&frame);
-            }
-            KTEST_ASSERT(a.ticks_left == 1,             "a still holds the CPU on its last tick");
-            KTEST_ASSERT(g_scheduler.curr_thread == &a, "no switch before the slice expires");
 
-            // The next tick expires a's slice: refills a and reschedules to b,
-            // and that timer-driven switch must move TSS.rsp0 onto b.
+            // Each tick rotates to the next thread and moves TSS.rsp0 with it.
             g_scheduler.pit_irq_handler(&frame);
-            KTEST_ASSERT(g_scheduler.curr_thread == &b,         "expired quantum reschedules to b");
-            KTEST_ASSERT(a.ticks_left == Thread::TIME_SLICE_MS, "a's quantum is refilled when preempted");
+            KTEST_ASSERT(g_scheduler.curr_thread == &b, "one tick rotates to b");
+            KTEST_ASSERT(a.ticks_left == Thread::TIME_SLICE_MS - 1,
+                         "the running thread's quantum ticks down by one");
             KTEST_ASSERT(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(b.rsp0),
-                         "the timer-driven switch updates TSS.rsp0 to b.rsp0");
+                         "TSS.rsp0 follows the switch to b");
+
+            g_scheduler.pit_irq_handler(&frame);
+            KTEST_ASSERT(g_scheduler.curr_thread == &a, "the next tick rotates back to a");
+            KTEST_ASSERT(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(a.rsp0),
+                         "TSS.rsp0 follows the switch back to a");
         }
 
-      
-        // Leave the scheduler clean: the blocks above queued stack-local threads
-        // that are now out of scope, and the live add_init_thread() path checks
-        // ready_threads.empty() to seed curr_thread. Without this, it inherits
-        // dangling pointers and the real timer faults on the first tick.
         reset_sched();
 
         KTest::summary("Scheduler");
