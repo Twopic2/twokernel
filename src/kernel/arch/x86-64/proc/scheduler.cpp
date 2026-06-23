@@ -129,10 +129,8 @@ namespace x86::Proc::Scheduler {
     void Schedule::yield() {
         lock_scheduler();
 
-        if (curr_thread) {
-            curr_thread->state = Thread::ThreadState::Ready;
-            ready_threads.push_tail(curr_thread);
-        }
+        curr_thread->state = Thread::ThreadState::Ready;
+        ready_threads.push_tail(curr_thread);
 
         Schedule::schedule();
 
