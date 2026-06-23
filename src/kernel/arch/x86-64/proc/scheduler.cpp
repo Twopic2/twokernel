@@ -94,10 +94,10 @@ namespace x86::Proc::Scheduler {
             switch_task(*curr_thread);
         } 
 
-        curr_thread = ready_threads.pop_head();
+        auto next_thread = ready_threads.pop_head();
+        next_thread->state = Thread::ThreadState::Running;
 
-        curr_thread->state = Thread::ThreadState::Running;
-        switch_task(*curr_thread);
+        switch_task(*next_thread);
     }
 
     void Schedule::switch_task(Thread::ThreadBlock& next_thread) {
