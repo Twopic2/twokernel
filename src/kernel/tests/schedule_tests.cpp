@@ -2,13 +2,14 @@
 #include <tests/ktest.hpp>
 #include <arch/x86-64/proc/scheduler.hpp>
 #include <arch/x86-64/proc/thread.hpp>
+#include <arch/x86-64/proc/process.hpp>
 #include <arch/x86-64/system/gdt.hpp>
 #include <drivers/pit.hpp>
 #include <cstdint>
 
-/**  
+/*
 
-*! Maybe I shouldn't vibe code the test cases 
+    ! Maybe I shouldn't vibe code the test cases
 
 */
 
@@ -31,15 +32,25 @@ namespace Tests {
         Util::klog("--- Scheduler Tests ---\n");
         KTest::reset();
 
+        // The kernel address space we must hand back when the suite finishes;
+        // every add_ready_threads()/switch_task() crossing leaves CR3 pointing
+        // at some process's PML4 instead.
+        const std::uintptr_t kernel_cr3 = Memory::Vmm::read_cr3();
+
         auto reset_sched = [] {
             g_scheduler.ready_threads.clear_all();
             g_scheduler.sleeping_threads.clear_all();
             g_scheduler.curr_thread          = nullptr;
             g_scheduler.task_switch_counter  = 0;
-            
+
             g_scheduler.disable_counter      = 0;
             g_scheduler.task_switch_postponed = false;
         };
+
+        // One shared process to back every single-process test below. Because
+        // all its threads share this address space, rotations between them never
+        // reload CR3 (switch_task only swaps CR3 across a process boundary).
+        Process::ProcessBlock kproc {};
 
         // ── A thread acquires its own kernel stack ───────────────────────────
         Thread::ThreadBlock t0 {};
@@ -58,8 +69,7 @@ namespace Tests {
         // ── schedule() runs the only ready thread and points TSS.rsp0 at it ──
         {
             reset_sched();
-            Thread::ThreadBlock a {};
-            a.m_name = "a";
+            Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
 
             KTEST_ASSERT(g_scheduler.curr_thread == nullptr, "fresh scheduler has no current thread");
 
@@ -74,9 +84,9 @@ namespace Tests {
         // ── Round-robin ordering, with TSS.rsp0 following every switch ────────
         {
             reset_sched();
-            Thread::ThreadBlock a {}; a.m_name = "a";
-            Thread::ThreadBlock b {}; b.m_name = "b";
-            Thread::ThreadBlock c {}; c.m_name = "c";
+            Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+            Thread::ThreadBlock b {}; b.m_name = "b"; b.m_process = &kproc;
+            Thread::ThreadBlock c {}; c.m_name = "c"; c.m_process = &kproc;
 
             g_scheduler.add_ready_threads(&a);
             g_scheduler.add_ready_threads(&b);
@@ -108,8 +118,7 @@ namespace Tests {
         // reschedules, so ticks_left is never observed at 0.
         {
             reset_sched();
-            Thread::ThreadBlock a {};
-            a.m_name = "a";
+            Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
 
             g_scheduler.add_ready_threads(&a);
             g_scheduler.schedule();
@@ -130,13 +139,14 @@ namespace Tests {
             KTEST_ASSERT(g_scheduler.curr_thread == &a,         "the only ready thread keeps running");
         }
 
-        // ── Rotation happens once per quantum, not once per tick ─────────────
-        // With two ready threads, a holds the CPU until its quantum drains; the
-        // expiry tick refills a's quantum and rotates to b.
+        // ── Every PIT tick rotates the CPU (one switch per tick) ─────────────
+        // The handler now reschedules on every tick, so with a second thread
+        // ready, a single tick hands the CPU over to b — long before a's
+        // quantum drains.
         {
             reset_sched();
-            Thread::ThreadBlock a {}; a.m_name = "a";
-            Thread::ThreadBlock b {}; b.m_name = "b";
+            Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+            Thread::ThreadBlock b {}; b.m_name = "b"; b.m_process = &kproc;
 
             g_scheduler.add_ready_threads(&a);
             g_scheduler.add_ready_threads(&b);
@@ -145,30 +155,21 @@ namespace Tests {
 
             x86::ArchIrq::IrqFrame frame {};
 
-            // Ticks inside the quantum decrement the counter but never rotate.
-            for (std::uint64_t i = 0; i < Thread::TIME_SLICE_MS - 1; ++i) {
-                g_scheduler.pit_irq_handler(&frame);
-                KTEST_ASSERT(g_scheduler.curr_thread == &a,
-                             "a keeps the CPU for the whole quantum");
-            }
-            KTEST_ASSERT(a.ticks_left == 1, "a's quantum is down to its final tick");
-
-            // The expiry tick refills a's quantum and rotates to b.
+            // One tick is enough to rotate now.
             g_scheduler.pit_irq_handler(&frame);
-            KTEST_ASSERT(g_scheduler.curr_thread == &b, "quantum expiry rotates to b");
-            KTEST_ASSERT(a.ticks_left == Thread::TIME_SLICE_MS,
-                         "the outgoing thread's quantum is refilled on expiry");
+            KTEST_ASSERT(g_scheduler.curr_thread == &b, "a single tick rotates a -> b");
+            KTEST_ASSERT(a.ticks_left == Thread::TIME_SLICE_MS - 1,
+                         "rotation happens with the quantum barely touched, not on expiry");
         }
 
         // ── On rotation the outgoing frame is saved and the incoming restored ──
-        // Rotation only fires on quantum expiry, so each test drains a full
-        // quantum; the expiry tick saves the outgoing thread's live frame into
-        // its TCB and loads the incoming thread's saved frame into *frame for
-        // the ISR epilogue / iretq.
+        // Rotation now fires on every tick: each tick saves the outgoing
+        // thread's live frame into its TCB and loads the incoming thread's
+        // saved frame into *frame for the ISR epilogue / iretq.
         {
             reset_sched();
-            Thread::ThreadBlock a {}; a.m_name = "a";
-            Thread::ThreadBlock b {}; b.m_name = "b";
+            Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+            Thread::ThreadBlock b {}; b.m_name = "b"; b.m_process = &kproc;
 
             // b waits, so its context lives in its TCB; a runs, so its live
             // context lives in the frame (the handler reads it from there).
@@ -184,21 +185,17 @@ namespace Tests {
             frame.rip = 0xA0;
             frame.rax = 0xAA;
 
-            // Drain a's quantum: rotation a -> b lands on the final tick.
-            for (std::uint64_t i = 0; i < Thread::TIME_SLICE_MS; ++i) {
-                g_scheduler.pit_irq_handler(&frame);
-            }
-            KTEST_ASSERT(g_scheduler.curr_thread == &b, "quantum expiry rotates a -> b");
+            // One tick: rotation a -> b.
+            g_scheduler.pit_irq_handler(&frame);
+            KTEST_ASSERT(g_scheduler.curr_thread == &b, "one tick rotates a -> b");
             KTEST_ASSERT(a.registers.rip == 0xA0 && a.registers.rax == 0xAA,
                          "outgoing thread a's live registers are saved into its TCB");
             KTEST_ASSERT(frame.rip == 0xB0 && frame.rax == 0xBB,
                          "incoming thread b's saved registers are restored into the frame");
 
-            // Drain b's quantum: rotation b -> a, and a's own frame comes back.
-            for (std::uint64_t i = 0; i < Thread::TIME_SLICE_MS; ++i) {
-                g_scheduler.pit_irq_handler(&frame);
-            }
-            KTEST_ASSERT(g_scheduler.curr_thread == &a, "the next quantum rotates back to a");
+            // Next tick: rotation b -> a, and a's own frame comes back.
+            g_scheduler.pit_irq_handler(&frame);
+            KTEST_ASSERT(g_scheduler.curr_thread == &a, "the next tick rotates back to a");
             KTEST_ASSERT(b.registers.rip == 0xB0 && b.registers.rax == 0xBB,
                          "outgoing thread b's live registers are saved into its TCB");
             KTEST_ASSERT(frame.rip == 0xA0 && frame.rax == 0xAA,
@@ -208,8 +205,8 @@ namespace Tests {
         // ── On rotation TSS.rsp0 moves to the incoming thread's stack ─────────
         {
             reset_sched();
-            Thread::ThreadBlock a {}; a.m_name = "a";
-            Thread::ThreadBlock b {}; b.m_name = "b";
+            Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+            Thread::ThreadBlock b {}; b.m_name = "b"; b.m_process = &kproc;
 
             g_scheduler.add_ready_threads(&a);
             g_scheduler.add_ready_threads(&b);
@@ -220,19 +217,9 @@ namespace Tests {
 
             x86::ArchIrq::IrqFrame frame {};
 
-            // A mid-quantum tick leaves the running thread and TSS.rsp0 in place.
+            // A single tick rotates to b and moves TSS.rsp0 with it.
             g_scheduler.pit_irq_handler(&frame);
-            KTEST_ASSERT(g_scheduler.curr_thread == &a, "a still runs mid-quantum");
-            KTEST_ASSERT(a.ticks_left == Thread::TIME_SLICE_MS - 1,
-                         "the running thread's quantum ticks down by one");
-            KTEST_ASSERT(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(a.rsp0),
-                         "TSS.rsp0 stays on a mid-quantum");
-
-            // Finish the quantum: the rotation to b moves TSS.rsp0 with it.
-            for (std::uint64_t i = 0; i < Thread::TIME_SLICE_MS - 1; ++i) {
-                g_scheduler.pit_irq_handler(&frame);
-            }
-            KTEST_ASSERT(g_scheduler.curr_thread == &b, "quantum expiry rotates to b");
+            KTEST_ASSERT(g_scheduler.curr_thread == &b, "a single tick rotates to b");
             KTEST_ASSERT(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(b.rsp0),
                          "TSS.rsp0 follows the switch to b");
         }
@@ -242,8 +229,8 @@ namespace Tests {
         // yield should requeue a as Ready and resume b.
         {
             reset_sched();
-            Thread::ThreadBlock a {}; a.m_name = "a";
-            Thread::ThreadBlock b {}; b.m_name = "b";
+            Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+            Thread::ThreadBlock b {}; b.m_name = "b"; b.m_process = &kproc;
 
             g_scheduler.curr_thread = &a;
             a.state = Thread::ThreadState::Running;
@@ -270,7 +257,7 @@ namespace Tests {
         // ── yield() with nothing else ready keeps the caller running ─────────
         {
             reset_sched();
-            Thread::ThreadBlock a {}; a.m_name = "a";
+            Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
 
             g_scheduler.curr_thread = &a;
             a.state = Thread::ThreadState::Running;
@@ -290,7 +277,7 @@ namespace Tests {
             const auto saved_clocks = Drivers::Pit::pit_clocks;
             Drivers::Pit::pit_clocks = 2 * Drivers::Pit::HZ;   // now() == 2000 ms
 
-            Thread::ThreadBlock a {}; a.m_name = "a";
+            Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
             g_scheduler.curr_thread = &a;
             a.state = Thread::ThreadState::Running;
 
@@ -319,7 +306,7 @@ namespace Tests {
             const auto saved_clocks = Drivers::Pit::pit_clocks;
             Drivers::Pit::pit_clocks = 0;                      // now() == 0 ms
 
-            Thread::ThreadBlock a {}; a.m_name = "a";
+            Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
             g_scheduler.curr_thread = &a;
             a.state = Thread::ThreadState::Running;
 
@@ -337,8 +324,8 @@ namespace Tests {
         // down one per tick and the thread is released when it hits zero.
         {
             reset_sched();
-            Thread::ThreadBlock runner  {}; runner.m_name  = "runner";
-            Thread::ThreadBlock sleeper {}; sleeper.m_name = "sleeper";
+            Thread::ThreadBlock runner  {}; runner.m_name  = "runner";  runner.m_process  = &kproc;
+            Thread::ThreadBlock sleeper {}; sleeper.m_name = "sleeper"; sleeper.m_process = &kproc;
 
             g_scheduler.add_ready_threads(&runner);            // curr = runner
 
@@ -359,7 +346,103 @@ namespace Tests {
                          "the woken sleeper is back on the ready queue");
         }
 
+        // ── Switching between threads that live in different processes ────────
+        // process A owns thread A, process B owns thread B. Each ProcessBlock{}
+        // builds a real, kernel-mapped address space, so crossing from one to
+        // the other reloads CR3 with the incoming process's PML4.
+        //
+        // add_ready_threads() loads process A's CR3 as soon as ta becomes the
+        // head, and it keeps ta in the ready queue as well as in curr_thread, so
+        // the *first* schedule() re-selects process A (no reload). The crossings
+        // begin on the next pick.
+        {
+            reset_sched();
+
+            Process::ProcessBlock pa {};
+            Process::ProcessBlock pb {};
+
+            Thread::ThreadBlock ta {}; ta.m_name = "A/threadA";
+            Thread::ThreadBlock tb {}; tb.m_name = "B/threadB";
+            pa.add_thread(&ta);                 // ta.m_process = &pa
+            pb.add_thread(&tb);                 // tb.m_process = &pb
+
+            KTEST_ASSERT(ta.m_process == &pa && tb.m_process == &pb,
+                         "each thread is bound to its own process");
+            KTEST_ASSERT(pa.vaddr.pml4_pa != pb.vaddr.pml4_pa,
+                         "the two processes own distinct address spaces");
+
+            g_scheduler.add_ready_threads(&ta);   // curr = ta, CR3 <- process A
+            KTEST_ASSERT((Memory::Vmm::read_cr3() & ~0xFFFull) == (pa.vaddr.pml4_pa & ~0xFFFull),
+                         "add_ready_threads() loads the first thread's process CR3");
+            g_scheduler.add_ready_threads(&tb);
+
+            g_scheduler.schedule();
+            KTEST_ASSERT(g_scheduler.curr_thread == &ta,
+                         "first schedule() stays on process A's thread");
+
+            // Cross into process B: CR3 must follow the address space.
+            g_scheduler.schedule();
+            KTEST_ASSERT(g_scheduler.curr_thread == &tb,
+                         "schedule() crosses over to process B's thread");
+            KTEST_ASSERT((Memory::Vmm::read_cr3() & ~0xFFFull) == (pb.vaddr.pml4_pa & ~0xFFFull),
+                         "crossing into process B loads B's PML4 into CR3");
+
+            // Cross back into process A: CR3 swings back.
+            g_scheduler.schedule();
+            KTEST_ASSERT(g_scheduler.curr_thread == &ta,
+                         "schedule() crosses back to process A's thread");
+            KTEST_ASSERT((Memory::Vmm::read_cr3() & ~0xFFFull) == (pa.vaddr.pml4_pa & ~0xFFFull),
+                         "crossing back into process A reloads A's PML4 into CR3");
+        }
+
+        // ── PIT ticks drive the cross-process switch, CR3 tracking curr ──────
+        // Every tick reschedules, so the CPU rotates between process A and
+        // process B. After each tick CR3 must match whatever process the
+        // current thread belongs to.
+        {
+            reset_sched();
+
+            Process::ProcessBlock pa {};
+            Process::ProcessBlock pb {};
+
+            Thread::ThreadBlock ta {}; ta.m_name = "A/threadA";
+            Thread::ThreadBlock tb {}; tb.m_name = "B/threadB";
+            pa.add_thread(&ta);
+            pb.add_thread(&tb);
+
+            g_scheduler.add_ready_threads(&ta);   // curr = ta, CR3 <- process A
+            g_scheduler.add_ready_threads(&tb);
+
+            x86::ArchIrq::IrqFrame frame {};
+            bool saw_process_b = false;
+            bool cr3_tracks_process = true;
+
+            for (int i = 0; i < 8; ++i) {
+                g_scheduler.pit_irq_handler(&frame);
+
+                if (g_scheduler.curr_thread == &tb) {
+                    saw_process_b = true;
+                }
+                const auto live   = Memory::Vmm::read_cr3() & ~0xFFFull;
+                const auto wanted = g_scheduler.curr_thread->m_process->vaddr.pml4_pa & ~0xFFFull;
+                if (live != wanted) {
+                    cr3_tracks_process = false;
+                }
+            }
+
+            KTEST_ASSERT(saw_process_b,
+                         "PIT ticks rotate the CPU over to process B");
+            KTEST_ASSERT(cr3_tracks_process,
+                         "after every tick CR3 matches the running thread's process");
+            KTEST_ASSERT(ta.ticks_left < Thread::TIME_SLICE_MS,
+                         "process A's quantum is being spent across the ticks");
+        }
+
         reset_sched();
+
+        // Hand the kernel address space back; the crossings above left CR3
+        // pointing at one of the test processes' page tables.
+        Memory::Vmm::load_cr3(kernel_cr3);
 
         KTest::summary("Scheduler");
     }

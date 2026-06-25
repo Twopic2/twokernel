@@ -42,6 +42,7 @@ namespace x86::Proc::Scheduler {
         void pit_irq_handler(ArchIrq::IrqFrame* frame);
         void schedule();
         void reschedule();
+        void set_idle_thread();
     };
 
     inline struct Schedule g_scheduler {};
