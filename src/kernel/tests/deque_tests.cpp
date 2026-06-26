@@ -89,8 +89,9 @@ namespace Tests {
             dq.push_tail(&c);
             dq.push_tail(&d);
 
-            dq.remove(&a);
-            KTEST_ASSERT(dq.size() == 3, "remove() of a middle node shrinks size by one");
+            dq.remove(&b);
+            auto _size = dq.size();
+            KTEST_ASSERT(_size == 3, "remove() of a middle node shrinks size by one");
 
             Item* expected[] = { &a, &c, &d };
             KTEST_ASSERT(order_matches(dq, expected, 3),
@@ -122,6 +123,29 @@ namespace Tests {
             KTEST_ASSERT(dq.size() == 0 && dq.empty(),
                          "removing the final node empties the deque");
 
+            dq.clear_all();
+        }
+
+        // tests to make sure that inserting and deleting middle doesn't case pointer issues. 
+        {
+            ItemDeque dq {};
+
+            dq.push_tail(&a);
+            dq.push_tail(&b);
+            dq.push_tail(&c);
+
+            KTEST_ASSERT(dq.size() == 3, "size");
+
+            dq.remove(&b);
+            Item* after_head[] = { &a, &c }; 
+
+            KTEST_ASSERT(dq.size() == 2 && order_matches(dq, after_head, 2),
+                         "removing the middle leaves the rest stable");
+            
+            dq.push_tail(&d);
+            Item* item[] = { &a, &c, &d }; 
+            KTEST_ASSERT(dq.size() == 3 && order_matches(dq, item, 3),
+                         "adding the middle leaves the rest stable");
             dq.clear_all();
         }
 
