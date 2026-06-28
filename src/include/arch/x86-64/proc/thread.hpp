@@ -38,9 +38,16 @@ namespace x86::Proc::Thread {
     };
 
     using FuncPtr = void (*)(void*);   
+
+    /* 
+        ! Note 
+        ! struct member vars matters for debugger 
+     */
     
     // Todo: add user stack
     struct ThreadBlock {
+        const char* m_name {};
+
         std::uint64_t* kernel_rsp;
         std::uint64_t* rsp0; // Points highest
         std::uint64_t* kernel_stack; // Points Lowest 
@@ -57,8 +64,6 @@ namespace x86::Proc::Thread {
 
         kstd::SingleNode hook {};
         kstd::SingleNode proc_hook {};
-
-        const char* m_name {};
 
         void exit();
 

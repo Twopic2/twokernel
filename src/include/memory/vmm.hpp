@@ -65,6 +65,12 @@ namespace Memory::Vmm {
         asm volatile("mov %0, %%cr3" :: "r"(cr3_value) : "memory");
     }
 
+    static inline std::uintptr_t read_cr3() {
+        std::uintptr_t vaddr {};
+        asm volatile("mov %%cr3, %0" : "=r"(vaddr));
+        return vaddr;
+    }
+
     static inline VAddressSpace new_pagemap() {
         std::uintptr_t pa = Pmm::alloc(1);
 

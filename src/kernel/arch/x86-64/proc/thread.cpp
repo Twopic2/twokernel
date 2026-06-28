@@ -9,7 +9,7 @@
 
 namespace x86::Proc::Thread {
     ThreadBlock::ThreadBlock(const char* name, Process::ProcessBlock* process, FuncPtr entry) 
-    : m_entry(entry), m_process(process), m_name(name) {
+    : m_name(name), m_entry(entry), m_process(process) {
         init_kernel_stack();
 
         ticks_left = TIME_SLICE_MS;

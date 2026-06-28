@@ -80,6 +80,7 @@ namespace kstd {
 
             constexpr void push_head(T* value) {
                 if (head == nullptr) {
+                    (value->*Hook).next = nullptr;
                     tail = value;
                     head = value;
                     return;
@@ -90,6 +91,7 @@ namespace kstd {
             }
 
             constexpr void push_tail(T* value) {
+                (value->*Hook).next = nullptr;
                 if (tail == nullptr) {
                     head = value;
                     tail = value;
@@ -121,9 +123,12 @@ namespace kstd {
                 }
 
                 auto tail_val = tail;
-               
-                if (head != tail) {
-                    auto new_tail = head; 
+
+                if (head == tail) {
+                    head = nullptr;
+                    tail = nullptr;
+                } else {
+                    auto new_tail = head;
 
                     while (static_cast<T*>((new_tail->*Hook).next) != tail) {
                         new_tail = static_cast<T*>((new_tail->*Hook).next);
