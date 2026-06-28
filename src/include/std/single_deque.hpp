@@ -145,9 +145,6 @@ namespace kstd {
                 if (value == tail) {
                     pop_tail();
                     return;
-                } else if (value == head) {
-                    pop_head();
-                    return;
                 }
 
                 auto prev_value = head;
