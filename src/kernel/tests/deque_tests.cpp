@@ -126,6 +126,29 @@ namespace Tests {
             dq.clear_all();
         }
 
+        {
+            ItemDeque dq {};
+            dq.push_head(&a);
+            dq.push_head(&b);
+            dq.push_head(&c);
+
+            dq.remove(&a); // head
+            Item* after_head[] = { &c, &b};
+            KTEST_ASSERT(dq.size() == 2 && order_matches(dq, after_head, 2),
+                         "push head test");
+
+            dq.remove(&c); // tail
+            Item* after_tail[] = { &b };
+            KTEST_ASSERT(dq.size() == 1 && order_matches(dq, after_tail, 1),
+                         "push head test");
+
+            dq.remove(&b); // last one
+            KTEST_ASSERT(dq.size() == 0 && dq.empty(),
+                         "push head test");
+
+            dq.clear_all();
+        }
+
         // tests to make sure that inserting and deleting middle doesn't case pointer issues. 
         {
             ItemDeque dq {};
