@@ -1,5 +1,6 @@
 #pragma once
 
+#include "memory/vmm.hpp"
 #include <cstdint>
 #include <arch/x86-64/arch/arch_irq.hpp>
 #include <std/single_deque.hpp>
@@ -29,6 +30,7 @@ namespace x86::Proc::Thread {
     inline constexpr std::uint64_t TIME_SLICE_MS = 10;
     inline std::uint64_t total_tid {};
     inline constexpr auto SET_RFLAGS = 0x202;
+    inline constexpr auto THREAD_KERNEL_SIZE = 4 * Memory::Vmm::PAGE_SIZE;
 
     enum class ThreadState : std::uint8_t {
         Ready,
@@ -48,7 +50,6 @@ namespace x86::Proc::Thread {
     struct ThreadBlock {
         const char* m_name {};
 
-        std::uint64_t* kernel_rsp;
         std::uint64_t* rsp0; // Points highest
         std::uint64_t* kernel_stack; // Points Lowest 
 

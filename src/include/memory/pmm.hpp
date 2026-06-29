@@ -19,9 +19,9 @@ namespace Memory::Pmm {
 
     static FreeList* freelist_head {};
 
-    std::uintptr_t alloc(std::size_t count);
-    void free(std::uintptr_t phys_mem, std::size_t size);
-    void reclaim_bootloader(std::uint64_t memap_type, std::uintptr_t phys_mem, std::uintptr_t page_amount);
+    std::uint64_t alloc(std::uint64_t count);
+    void free(std::uint64_t phys_mem, std::uint64_t size);
+    void reclaim_bootloader(std::uint64_t memap_type, std::uint64_t phys_mem, std::uint64_t page_amount);
 
     void push_list(std::uint64_t phys, std::uint64_t page_amount);
 

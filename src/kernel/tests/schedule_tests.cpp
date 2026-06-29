@@ -35,7 +35,7 @@ namespace Tests {
         // The kernel address space we must hand back when the suite finishes;
         // every add_ready_threads()/switch_task() crossing leaves CR3 pointing
         // at some process's PML4 instead.
-        const std::uintptr_t kernel_cr3 = Memory::Vmm::read_cr3();
+        const std::uint64_t kernel_cr3 = Memory::Vmm::read_cr3();
 
         auto reset_sched = [] {
             g_scheduler.ready_threads.clear_all();
@@ -59,10 +59,8 @@ namespace Tests {
         KTEST_ASSERT(t0.kernel_stack != t0.rsp0,
                      "thread stack base (kernel_stack) sits below its top (rsp0)");
         KTEST_ASSERT(reinterpret_cast<std::uintptr_t>(t0.rsp0) - reinterpret_cast<std::uintptr_t>(t0.kernel_stack)
-                         == 4 * Memory::Vmm::page_size,
+                         == 4 * Memory::Vmm::PAGE_SIZE,
                      "thread kernel stack spans exactly 4 pages (rsp0 = base + 0x4000)");
-        KTEST_ASSERT(t0.kernel_rsp == t0.rsp0,
-                     "fresh thread's saved kernel_rsp starts at the stack top");
         KTEST_ASSERT(t0.kernel_stack != t1.kernel_stack,
                      "distinct threads own distinct kernel stacks");
 

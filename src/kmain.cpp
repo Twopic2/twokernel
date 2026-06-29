@@ -45,6 +45,8 @@ extern "C" void kmain() {
     Memory::Pmm::init_pmm();
     Memory::Vmm::init();
 
+    Tests::run_pmm_tests();
+    Tests::run_vmm_tests();
 
    // Tests::run_scheduler_tests();
 
@@ -53,7 +55,6 @@ extern "C" void kmain() {
     x86::Dev::Keyboard::keyboard_init();
 
     Tests::deque_tests();
-
 
     //Tests::keyboard_irq_tests();
 

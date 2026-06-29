@@ -7,7 +7,7 @@
 #include <memory/pmm.hpp>
 
 namespace Memory::Pmm {
-    std::uintptr_t alloc(std::size_t count) {
+    std::uint64_t alloc(std::uint64_t count) {
         FreeList* prev = nullptr;
         FreeList* curr = freelist_head;
 
@@ -21,7 +21,7 @@ namespace Memory::Pmm {
                 }
 
                 if (curr->num_pages > count) {
-                    auto page_amount = (count * Vmm::page_size);
+                    auto page_amount = (count * Vmm::PAGE_SIZE);
                     std::uint64_t phys_offset = curr->pa + page_amount;
                     std::uint64_t page_offset = curr->num_pages - count;
                     
@@ -38,7 +38,7 @@ namespace Memory::Pmm {
         return 0;
     }
 
-    void free(std::uintptr_t phys_mem, std::uint64_t count) {
+    void free(std::uint64_t phys_mem, std::uint64_t count) {
         push_list(phys_mem, count);
     }
 
@@ -52,7 +52,7 @@ namespace Memory::Pmm {
             if (entry->type == Limine::Memmap::usable) {
                 // entry->base would be starting physical address
                 // entry->length: size of memory    
-                std::uint64_t entry_page_amount = static_cast<uint64_t>(entry->length / Vmm::page_size);         
+                std::uint64_t entry_page_amount = static_cast<uint64_t>(entry->length / Vmm::PAGE_SIZE);         
                 
                 push_list(entry->base, entry_page_amount);
             }
@@ -60,7 +60,6 @@ namespace Memory::Pmm {
         // Util::klog("Finished mapping physical mem to virtual mem\n");
     }
 
-    /// push front
     void push_list(std::uint64_t phys, std::uint64_t page_amount) {
         FreeList* node = reinterpret_cast<FreeList*>(phys + Limine::get_hhdm());
         

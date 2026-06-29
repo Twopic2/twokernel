@@ -11,6 +11,8 @@
 /// NOTES:
 /*
 
+
+
 Level 4 paging 
 PML4 -> PDP -> PD -> PT
 
@@ -27,6 +29,13 @@ If we are using 4Kib pages then we will have: PML4, PDPR, PD, PT, while
 if we go for 2Mib Pages we have only PML4, PDPR, PD, and finally 1Gib pages would only use the PML4 and PDPR.
 */
 
+/* 
+    ! Page Directories and Tables
+    ? Page Table contains the information about a single page of memory, 
+    ? an entry in a page table represents the starting physical memory address for this page.
+
+    ? Page Directory an entry in a page directory can point to depending on the page size selecte
+*/
 namespace Memory::Vmm {
     // Credit to @RaidTheWeb inside vmm.hpp for the idea of Direct Map
     inline constexpr std::uint64_t PRESENT = (1 << 0); // Is the page currently in physical memory? Triggers pagefault when accessed if not set -> Useful for handling swapped out memory!
@@ -38,8 +47,7 @@ namespace Memory::Vmm {
     inline constexpr std::uint64_t PADDR_MASK = 0x0000FFFFFFFFF000; // Getting PA from va 
     inline constexpr uint64_t OFFMASK = 0b111111111111;
 
-    inline constexpr std::size_t page_size = 0x1000;
-    inline constexpr std::size_t entry_byte_size = 4096;
+    inline constexpr std::size_t PAGE_SIZE = 0x1000;
 
     // Direct Map way since its way easier 
     struct PageMap {
@@ -48,7 +56,7 @@ namespace Memory::Vmm {
 
     struct VAddressSpace {
         struct PageMap* pml4;
-        std::uintptr_t pml4_pa;
+        std::uint64_t pml4_pa;
     }; 
     
     inline struct VAddressSpace kernel_space;
@@ -65,14 +73,14 @@ namespace Memory::Vmm {
         asm volatile("mov %0, %%cr3" :: "r"(cr3_value) : "memory");
     }
 
-    static inline std::uintptr_t read_cr3() {
-        std::uintptr_t vaddr {};
+    static inline std::uint64_t read_cr3() {
+        std::uint64_t vaddr {};
         asm volatile("mov %%cr3, %0" : "=r"(vaddr));
         return vaddr;
     }
 
     static inline VAddressSpace new_pagemap() {
-        std::uintptr_t pa = Pmm::alloc(1);
+        std::uint64_t pa = Pmm::alloc(1);
 
         PageMap* pml4 = reinterpret_cast<PageMap*>(pa + Limine::hhdm.response->offset);
         LibC::memset(pml4->entries.data(), 0, sizeof(pml4->entries));
@@ -80,15 +88,15 @@ namespace Memory::Vmm {
         return VAddressSpace{ .pml4 = pml4, .pml4_pa = pa };
     }
 
-    PageMap* get_next_level(struct PageMap& entry, std::size_t index, bool allocates);
+    PageMap* get_next_level(struct PageMap& entry, std::size_t index, std::uint64_t flags, bool allocates);
 
     void fill_kernel_entries(struct VAddressSpace& vaddr);
-    void map_limine_kernel_addr(uintptr_t start, std::uintptr_t end, std::uint64_t flags);
-    void map(struct PageMap& pagemap, std::uintptr_t pa, std::uintptr_t va, std::size_t length, std::uint64_t flags);
+    void map_limine_kernel_addr(std::uint64_t start, std::uint64_t end, std::uint64_t flags);
+    void map(struct PageMap& pagemap, std::uint64_t pa, std::uint64_t va, std::size_t length, std::uint64_t flags);
     /* PageMap no longer points to pa */
-    void unmap(struct PageMap& pagemap, std::uintptr_t va, std::size_t length);
+    void unmap(struct PageMap& pagemap, std::uint64_t va, std::size_t length);
 
-    std::uintptr_t va_to_pa(struct VAddressSpace& space, std::uintptr_t va);
+    std::uint64_t va_to_pa(struct VAddressSpace& space, std::uint64_t va);
     void process_fill_kernel_entries(struct VAddressSpace& vaddr);
     
     //void* vm_alloc(std::size_t pages, std::uint64_t flags);

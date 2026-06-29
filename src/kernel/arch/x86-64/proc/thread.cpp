@@ -43,11 +43,10 @@ namespace x86::Proc::Thread {
         auto* k_stack = reinterpret_cast<std::uint64_t*>(pa + Limine::get_hhdm());
         kernel_stack = k_stack;
 
-        auto* top = reinterpret_cast<std::byte*>(k_stack) + 4 * Memory::Vmm::page_size;
+        auto* top = reinterpret_cast<std::byte*>(k_stack) + THREAD_KERNEL_SIZE;
         rsp0 = reinterpret_cast<std::uint64_t*>(top);
 
         registers.rsp = reinterpret_cast<std::uint64_t>(rsp0);
-        kernel_rsp = rsp0;
     }
 
     void ThreadBlock::exit() {

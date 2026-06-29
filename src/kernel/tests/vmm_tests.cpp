@@ -23,17 +23,17 @@ namespace Tests {
         KTEST_ASSERT(upper_half_ok, "all upper half PML4 entries (256-511) are present");
 
         // HHDM: va_to_pa on a known physical page should recover the physical address
-        std::uintptr_t phys = Memory::Pmm::alloc(1);
+        std::uint64_t phys = Memory::Pmm::alloc(1);
         KTEST_ASSERT(phys != 0, "PMM alloc for va_to_pa test succeeded");
 
-        std::uintptr_t hhdm_va = phys + Limine::get_hhdm();
-        std::uintptr_t recovered = Memory::Vmm::va_to_pa(Memory::Vmm::kernel_space, hhdm_va);
+        std::uint64_t hhdm_va = phys + Limine::get_hhdm();
+        std::uint64_t recovered = Memory::Vmm::va_to_pa(Memory::Vmm::kernel_space, hhdm_va);
         KTEST_ASSERT(recovered == phys, "va_to_pa recovers correct physical address via HHDM");
 
         Memory::Pmm::free(phys, 1);
 
         // HHDM write/read through virtual address
-        std::uintptr_t phys2 = Memory::Pmm::alloc(1);
+        std::uint64_t phys2 = Memory::Pmm::alloc(1);
         auto* vptr = reinterpret_cast<std::uint64_t*>(phys2 + Limine::get_hhdm());
         *vptr = 0xDEADBEEFCAFEBABEull;
         KTEST_ASSERT(*vptr == 0xDEADBEEFCAFEBABEull, "HHDM virtual address is writable");
