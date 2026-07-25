@@ -1,6 +1,6 @@
 # TwoKernel
 
-A hobbyist monolithic kernel written in c++.
+A hobbyist monolithic kernel written in c++. Trying to be posix style.
 
 # Resources
 
@@ -40,12 +40,12 @@ https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
 - [x] Ready queue + round-robin scheduler
 - [x] Timer-driven preemption (PIC timer ISR → `schedule()`)
 - [?] `sleep`/wait queues, blocking primitives
-- [ ] Idle thread
+- [?] Idle thread
 
 ## 06 — Userspace
 - [ ] User CS/DS/TSS in GDT, IST stacks
-- [ ] Per-process address space (clone kernel-half PML4 entries into new pagemap)
-- [ ] User page mapping flags (USER bit) in VMM
+- [x] Per-process address space (clone kernel-half PML4 entries into new pagemap)
+- [x] User page mapping flags (USER bit) in VMM
 - [ ] ELF64 loader (program headers → mmap into address space)
 - [ ] `iretq`-based ring 3 entry
 - [ ] Syscall entry: SYSCALL/SYSRET, MSR setup (STAR/LSTAR/SFMASK)

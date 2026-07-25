@@ -5,6 +5,7 @@
 #include "std/single_deque.hpp"
 #include <arch/x86-64/proc/thread.hpp>
 #include <cstdint>
+#include <string_view>
 
 /// NOTES:
 /* 
@@ -35,7 +36,7 @@ namespace x86::Proc::Process {
     enum class ProcStats : std::uint8_t {
         Ready,
         Running,
-        Sleep,
+        Blocked,
         Zombie,
     };
 
@@ -50,11 +51,11 @@ namespace x86::Proc::Process {
         
         ProcStats status; 
         FuncPtr m_entry;
-        const char* m_name;
+        std::string_view m_name;
         std::uint16_t pid;
         std::uint8_t thread_size {};
 
-        ProcessBlock(const char* name, FuncPtr entry);
+        ProcessBlock(std::string_view name, FuncPtr entry);
         ProcessBlock();
 
         void add_thread(Thread::ThreadBlock* thread);

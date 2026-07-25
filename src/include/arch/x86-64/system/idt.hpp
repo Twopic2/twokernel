@@ -4,7 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <std/array>
-#include <std/string_view>
+#include <string_view>
 #include <std/cstdint>
 
 /// @Note:

@@ -2,6 +2,7 @@
 
 #include "memory/vmm.hpp"
 #include <cstdint>
+#include <string_view>
 #include <arch/x86-64/arch/arch_irq.hpp>
 #include <std/single_deque.hpp>
 #include <util/irq_gaurd.hpp>
@@ -35,7 +36,7 @@ namespace x86::Proc::Thread {
     enum class ThreadState : std::uint8_t {
         Ready,
         Running,
-		Sleep,
+		Blocked,
         Zombie
     };
 
@@ -48,7 +49,7 @@ namespace x86::Proc::Thread {
     
     // Todo: add user stack
     struct ThreadBlock {
-        const char* m_name {};
+        std::string_view m_name {};
 
         std::uint64_t* rsp0; // Points highest
         std::uint64_t* kernel_stack; // Points Lowest 
@@ -71,7 +72,7 @@ namespace x86::Proc::Thread {
         void init_kernel_stack();
 
         // Basically the create_kernel_task inside Brendan's Multi-taskng Tutorial
-        ThreadBlock(const char* name, Process::ProcessBlock* process, FuncPtr entry);
+        ThreadBlock(std::string_view name, Process::ProcessBlock* process, FuncPtr entry);
         ThreadBlock();
     };  
 }

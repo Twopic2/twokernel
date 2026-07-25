@@ -6,7 +6,7 @@
 #include <cstdint>
 
 namespace x86::Proc::Process {
-    ProcessBlock::ProcessBlock(const char* name, FuncPtr entry) :
+    ProcessBlock::ProcessBlock(std::string_view name, FuncPtr entry) :
     m_entry(entry), m_name(name) {
        // Util::IrqGaurd irq {};
         vaddr = Memory::Vmm::new_pagemap();

@@ -8,7 +8,7 @@
 #include <cstdint>
 
 namespace x86::Proc::Thread {
-    ThreadBlock::ThreadBlock(const char* name, Process::ProcessBlock* process, FuncPtr entry) 
+    ThreadBlock::ThreadBlock(std::string_view name, Process::ProcessBlock* process, FuncPtr entry)
     : m_name(name), m_entry(entry), m_process(process) {
         init_kernel_stack();
 

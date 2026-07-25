@@ -125,7 +125,8 @@ set(LIBC_SOURCES
 
 add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCES}
     src/include/drivers/ps2.hpp
-    src/include/arch/x86-64/arch/event.hpp)
+    src/include/arch/x86-64/arch/event.hpp
+    src/include/std/atomic)
 
 if(CMAKE_HOST_APPLE)
     target_compile_definitions(twokernel.elf PRIVATE TWOKERNEL_HOST_MACOS)

@@ -19,7 +19,8 @@ namespace x86::System::Idt {
         Util::klog("%s  rsi=%llx  rdi=%llx  rbp=%llx%s\n", RED, frame->rsi, frame->rdi, frame->rbp, RESET);
         Util::klog("%s  r8=%llx   r9=%llx   r10=%llx  r11=%llx%s\n", RED, frame->r8, frame->r9, frame->r10, frame->r11, RESET);
         Util::klog("%s  r12=%llx  r13=%llx  r14=%llx  r15=%llx%s\n", RED, frame->r12, frame->r13, frame->r14, frame->r15, RESET);
-        for (;;) __asm__ volatile("cli; hlt");
+        
+        asm volatile("cli; hlt");
     }
 
     void x86_div_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("divide error (#DE)", frame); }

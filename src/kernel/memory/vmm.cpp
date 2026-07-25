@@ -33,8 +33,7 @@ namespace Memory::Vmm {
 
                 std::uint64_t v_addr = Limine::get_hhdm() + entry->base;
 
-                map(*kernel_space.pml4, entry->base, v_addr, entry->length,
-                    PRESENT | WRITEABLE | NX);
+                map(*kernel_space.pml4, entry->base, v_addr, entry->length,PRESENT | WRITEABLE | NX);
             }
         }
         // Util::klog("Finished mapping Kernel's Virtual address\n");
@@ -51,10 +50,10 @@ namespace Memory::Vmm {
                                PRESENT | WRITEABLE | NX);
        // Util::klog("Finished limine_executable_address_request Mapping\n");
 
-        std::uint64_t efer = 0;
-        asm volatile("rdmsr" : "=A"(efer) : "c"(Cpu::MSREFER));
-        efer |= (1 << 11);
-        asm volatile("wrmsr" :: "c"(Cpu::MSREFER), "A"(efer));
+        std::uint32_t lo, hi;
+        asm volatile("rdmsr" : "=a"(lo), "=d"(hi) : "c"(Cpu::MSREFER));
+        lo |= (1 << 11);
+        asm volatile("wrmsr" :: "c"(Cpu::MSREFER), "a"(lo), "d"(hi));
 
         load_cr3(kernel_space.pml4_pa);
         // Util::klog("VMM loaded CR3=0x%llx\n", kernel_space.pml4_pa);
@@ -137,9 +136,10 @@ namespace Memory::Vmm {
             
             if (flags & USER) {
                 entry.entries[cur_level] = new_pa | PRESENT | WRITEABLE | USER;
+            } else {
+                entry.entries[cur_level] = new_pa | PRESENT | WRITEABLE ;
             }
-            entry.entries[cur_level] = new_pa | PRESENT | WRITEABLE ;
-
+            
             return next_level;
         } 
         
@@ -171,7 +171,6 @@ namespace Memory::Vmm {
         // Util::klog("finished kernel_space upper half vaddress init\n");
     }
 
-    /// for adding a new vaddr proc
     void process_fill_kernel_entries(struct VAddressSpace& vaddr) {
         for (std::size_t i = 256; i < 512; i++) {
             vaddr.pml4->entries[i] = kernel_space.pml4->entries[i];
