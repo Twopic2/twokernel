@@ -2,28 +2,23 @@
 #include <arch/x86-64/system/irq.hpp>
 
 namespace Tests {
-    void run_irq_tests() {
-        Util::klog("--- IRQ Tests ---\n");
-        KTest::reset();
-
-        // exception handlers 0-31 registered by idt_init()
+    TEST_CASE("idt_init registers the exception handlers", "[irq]") {
         // spot check a few known ones
-        KTEST_ASSERT(x86::System::Irq::irq_handlers[0]  != nullptr, "divide error handler registered (vector 0)");
-        KTEST_ASSERT(x86::System::Irq::irq_handlers[14] != nullptr, "page fault handler registered (vector 14)");
-        KTEST_ASSERT(x86::System::Irq::irq_handlers[13] != nullptr, "GPF handler registered (vector 13)");
+        CHECK(x86::System::Irq::irq_handlers[0]  != nullptr); // divide error
+        CHECK(x86::System::Irq::irq_handlers[14] != nullptr); // page fault
+        CHECK(x86::System::Irq::irq_handlers[13] != nullptr); // GPF
 
         // vectors with no handler (nullptrs in x86_exception_handlers)
-        KTEST_ASSERT(x86::System::Irq::irq_handlers[15] == nullptr, "vector 15 has no handler (reserved)");
+        CHECK(x86::System::Irq::irq_handlers[15] == nullptr); // reserved
+    }
 
-        // deregister it
+    TEST_CASE("deregister_handler clears the slot", "[irq]") {
         x86::System::Irq::deregister_handler(33);
-        KTEST_ASSERT(x86::System::Irq::irq_handlers[33] == nullptr,
-                     "deregister_handler clears the slot");
+        CHECK(x86::System::Irq::irq_handlers[33] == nullptr);
+    }
 
-        // timer handler registered in kmain (IRQ 0 = vector 32)
-        KTEST_ASSERT(x86::System::Irq::irq_handlers[32] != nullptr,
-                     "timer handler registered at vector 32");
-
-        KTest::summary("IRQ");
+    TEST_CASE("timer handler is registered at vector 32", "[irq]") {
+        // registered in kmain (IRQ 0 = vector 32)
+        CHECK(x86::System::Irq::irq_handlers[32] != nullptr);
     }
 }

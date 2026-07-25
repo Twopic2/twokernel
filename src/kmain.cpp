@@ -45,18 +45,20 @@ extern "C" void kmain() {
     Memory::Pmm::init_pmm();
     Memory::Vmm::init();
 
-    Tests::run_pmm_tests();
-    Tests::run_vmm_tests();
+    KTest::run("[pmm]");
+    KTest::run("[vmm]");
 
-   // Tests::run_scheduler_tests();
+   // KTest::run("[scheduler]");
 
     x86::Dev::Timer::timer_init();
 
     x86::Dev::Keyboard::keyboard_init();
 
-    Tests::deque_tests();
+    KTest::run("[deque]");
 
-    //Tests::keyboard_irq_tests();
+    //KTest::run("[keyboard]");
+    //KTest::run("[irq]");
+    //KTest::run("[ringbuffer]");
 
     // Once we finish we halt
     CxxRuntime::hcf();

@@ -13,7 +13,7 @@ namespace Tests {
             return code;
         }
 
-        // g_keyboard is live (init ran, the ISR feeds it), so every section
+        // g_keyboard is live (init ran, the ISR feeds it), so every case
         // starts from a known state instead of a fresh instance
         void normalize(Drivers::Ps2::Ps2Keyboard& kb) {
             while (!kb.data.is_empty()) {
@@ -25,149 +25,156 @@ namespace Tests {
         constexpr std::uint8_t code_of(Arch::ScanCode sc) {
             return static_cast<std::uint8_t>(sc);
         }
-    }
-
-    void keyboard_irq_tests() {
-        Util::klog("--- Keyboard IRQ1 Tests ---\n");
-        KTest::reset();
-
-        using Drivers::Ps2::PS2Ack;
-        using Drivers::Ps2::State;
-
-        auto& kb = x86::Dev::Keyboard::device();
 
         // The nack path resends last_data to the live keyboard, and its ack
-        // would race these assertions through the ISR; keep IRQ1 quiet for
-        // the whole suite and swallow the provoked replies at the end
-        x86::System::Irq::irq_mask(1);
-
-        // ── normalized device state ───────────────────────────────────────────
-        {
-            normalize(kb);
-            KTEST_ASSERT(kb.data.is_empty(),              "drained device has an empty buffer");
-            KTEST_ASSERT(kb.state_machine == State::None, "drained device sits in State::None");
-        }
-
-        // ── make code is decoded and buffered ─────────────────────────────────
-        {
-            normalize(kb);
-            kb.on_recieve(0x1E); // press 'A'
-            KTEST_ASSERT(kb.data.get_size() == 1,                     "make code lands in the buffer");
-            KTEST_ASSERT(next_code(kb) == code_of(Arch::ScanCode::A), "make code decodes to ScanCode::A");
-        }
-
-        // ── break code (release) is filtered out ──────────────────────────────
-        {
-            normalize(kb);
-            kb.on_recieve(0x9E); // release 'A' (0x1E | 0x80)
-            KTEST_ASSERT(kb.data.is_empty(), "break code alone buffers nothing");
-
-            kb.on_recieve(0x1E);
-            kb.on_recieve(0x9E);
-            KTEST_ASSERT(kb.data.get_size() == 1, "press + release yields exactly one entry");
-            KTEST_ASSERT(next_code(kb) == code_of(Arch::ScanCode::A), "the entry is the press, not the release");
-        }
-
-        // ── controller replies set signal and stay out of the buffer ──────────
-        {
-            normalize(kb);
-            kb.on_recieve(0xFA);
-            KTEST_ASSERT(kb.signal == PS2Ack::Ack,  "0xFA sets signal to Ack");
-            KTEST_ASSERT(kb.data.is_empty(),        "ack byte is not buffered as a key");
-
-            kb.on_recieve(0xFE);
-            KTEST_ASSERT(kb.signal == PS2Ack::Nack, "0xFE sets signal to Nack");
-            KTEST_ASSERT(kb.data.is_empty(),        "nack byte is not buffered as a key");
-        }
-
-        // ── E0 prefix arms the state machine without buffering ────────────────
-        {
-            normalize(kb);
-            kb.on_recieve(0xE0);
-            KTEST_ASSERT(kb.data.is_empty(),            "E0 prefix alone buffers nothing");
-            KTEST_ASSERT(kb.state_machine == State::E0, "E0 prefix arms the state machine");
-
-            kb.on_recieve(0x48); // E0 48 = Up arrow press
-            KTEST_ASSERT(kb.data.get_size() == 1,         "extended make code lands in the buffer");
-            KTEST_ASSERT(next_code(kb) == code_of(Arch::ScanCode::Up), "E0 48 decodes to ScanCode::Up");
-            KTEST_ASSERT(kb.state_machine == State::None, "state machine resets after the extended byte");
-        }
-
-        // ── extended release is filtered and disarms the prefix ───────────────
-        {
-            normalize(kb);
-            kb.on_recieve(0xE0);
-            kb.on_recieve(0xC8); // E0 C8 = Up arrow release
-            KTEST_ASSERT(kb.data.is_empty(),              "extended break code buffers nothing");
-            KTEST_ASSERT(kb.state_machine == State::None, "state machine resets after extended release");
-
-            // the next plain byte must decode as a single-byte code again
-            kb.on_recieve(0x48); // Keypad8 without a prefix
-            KTEST_ASSERT(next_code(kb) == code_of(Arch::ScanCode::Keypad8),
-                         "plain byte after an E0 sequence decodes as single-byte");
-        }
-
-        // ── keystrokes drain in the order they were typed ─────────────────────
-        {
-            normalize(kb);
-            const std::uint8_t hello[] = { 0x23, 0x12, 0x26, 0x26, 0x18 }; // h e l l o
-            for (std::uint8_t make : hello) {
-                kb.on_recieve(make);
-                kb.on_recieve(make | 0x80);
+        // would race the assertions through the ISR; keep IRQ1 quiet for the
+        // whole case and swallow any provoked replies on the way out. RAII so
+        // a failing REQUIRE (which returns early) can't leave IRQ1 masked.
+        struct Irq1Silencer {
+            Irq1Silencer() {
+                x86::System::Irq::irq_mask(1);
             }
-            KTEST_ASSERT(kb.data.get_size() == 5, "five presses queue five scancodes");
-
-            bool order_ok = true;
-            for (std::uint8_t make : hello) {
-                if (next_code(kb) != make) {
-                    order_ok = false;
-                    break;
+            ~Irq1Silencer() {
+                while (x86::IO::inb(Drivers::Ps2::STATUS_PORT) & 1) {
+                    x86::IO::inb(Drivers::Ps2::DATA_PORT);
                 }
+                x86::System::Irq::irq_unmask(1);
             }
-            KTEST_ASSERT(order_ok,           "scancodes drain in typed (FIFO) order");
-            KTEST_ASSERT(kb.data.is_empty(), "buffer is empty after draining the word");
+        };
+    }
+
+    TEST_CASE("a drained device has an empty buffer and idle state machine", "[keyboard]") {
+        Irq1Silencer quiet {};
+        auto& kb = x86::Dev::Keyboard::device();
+        normalize(kb);
+
+        CHECK(kb.data.is_empty());
+        CHECK(kb.state_machine == Drivers::Ps2::State::None);
+    }
+
+    TEST_CASE("make codes are decoded and buffered", "[keyboard]") {
+        Irq1Silencer quiet {};
+        auto& kb = x86::Dev::Keyboard::device();
+        normalize(kb);
+
+        kb.on_recieve(0x1E); // press 'A'
+        REQUIRE(kb.data.get_size() == 1);
+        CHECK(next_code(kb) == code_of(Arch::ScanCode::A));
+    }
+
+    TEST_CASE("break codes (releases) are filtered out", "[keyboard]") {
+        Irq1Silencer quiet {};
+        auto& kb = x86::Dev::Keyboard::device();
+        normalize(kb);
+
+        kb.on_recieve(0x9E); // release 'A' (0x1E | 0x80)
+        CHECK(kb.data.is_empty());
+
+        kb.on_recieve(0x1E);
+        kb.on_recieve(0x9E);
+        REQUIRE(kb.data.get_size() == 1);
+        CHECK(next_code(kb) == code_of(Arch::ScanCode::A));
+    }
+
+    TEST_CASE("controller replies set signal and stay out of the buffer", "[keyboard]") {
+        Irq1Silencer quiet {};
+        auto& kb = x86::Dev::Keyboard::device();
+        normalize(kb);
+
+        kb.on_recieve(0xFA);
+        CHECK(kb.signal == Drivers::Ps2::PS2Ack::Ack);
+        CHECK(kb.data.is_empty());
+
+        kb.on_recieve(0xFE);
+        CHECK(kb.signal == Drivers::Ps2::PS2Ack::Nack);
+        CHECK(kb.data.is_empty());
+    }
+
+    TEST_CASE("E0 prefix arms the state machine without buffering", "[keyboard]") {
+        Irq1Silencer quiet {};
+        auto& kb = x86::Dev::Keyboard::device();
+        normalize(kb);
+
+        kb.on_recieve(0xE0);
+        CHECK(kb.data.is_empty());
+        CHECK(kb.state_machine == Drivers::Ps2::State::E0);
+
+        kb.on_recieve(0x48); // E0 48 = Up arrow press
+        REQUIRE(kb.data.get_size() == 1);
+        CHECK(next_code(kb) == code_of(Arch::ScanCode::Up));
+        CHECK(kb.state_machine == Drivers::Ps2::State::None);
+    }
+
+    TEST_CASE("extended release is filtered and disarms the prefix", "[keyboard]") {
+        Irq1Silencer quiet {};
+        auto& kb = x86::Dev::Keyboard::device();
+        normalize(kb);
+
+        kb.on_recieve(0xE0);
+        kb.on_recieve(0xC8); // E0 C8 = Up arrow release
+        CHECK(kb.data.is_empty());
+        CHECK(kb.state_machine == Drivers::Ps2::State::None);
+
+        // the next plain byte must decode as a single-byte code again
+        kb.on_recieve(0x48); // Keypad8 without a prefix
+        CHECK(next_code(kb) == code_of(Arch::ScanCode::Keypad8));
+    }
+
+    TEST_CASE("keystrokes drain in the order they were typed", "[keyboard]") {
+        Irq1Silencer quiet {};
+        auto& kb = x86::Dev::Keyboard::device();
+        normalize(kb);
+
+        const std::uint8_t hello[] = { 0x23, 0x12, 0x26, 0x26, 0x18 }; // h e l l o
+        for (std::uint8_t make : hello) {
+            kb.on_recieve(make);
+            kb.on_recieve(make | 0x80);
         }
+        REQUIRE(kb.data.get_size() == 5);
 
-        {
-            normalize(kb);
-
-            // A real nack below the limit resends last_sent to the device and
-            // the ack would race these assertions, so start one short of the
-            // limit: this path goes straight to the controller, no device I/O
-            kb.nack_count = Drivers::Ps2::MAX_RETRY - 1;
-            kb.on_recieve(0xFE);
-            KTEST_ASSERT(kb.signal == PS2Ack::Error,
-                         "nack at the retry limit escalates to Error");
-            KTEST_ASSERT(kb.data.is_empty(), "nack traffic never reaches the buffer");
-
-            // The escalation disabled port 1; bring it back for the rest of boot
-            kb.write_cmd(Drivers::Ps2::ENABLE_PORT1);
-            kb.nack_count = 0;
-
-            kb.nack_count = 2;
-            kb.on_recieve(0xFA);
-            KTEST_ASSERT(kb.signal == PS2Ack::Ack, "ack after nacks sets signal back to Ack");
-            KTEST_ASSERT(kb.nack_count == 0,       "ack ends the retry streak");
+        bool order_ok = true;
+        for (std::uint8_t make : hello) {
+            if (next_code(kb) != make) {
+                order_ok = false;
+                break;
+            }
         }
+        CHECK(order_ok);
+        CHECK(kb.data.is_empty());
+    }
 
-        // ── IRQ1 routes through the dispatcher into g_keyboard ────────────────
-        {
-            normalize(kb);
-            // The data port holds whatever byte is stale, so the buffer may
-            // gain at most one entry; anything more means the routing is wrong
-            x86::System::Irq::hardware_interrupt_dispatch(1, nullptr);
-            KTEST_ASSERT(kb.data.get_size() <= 1,
-                         "dispatch on line 1 feeds isr_keyboard exactly one byte");
-            normalize(kb);
-        }
+    TEST_CASE("nack handling retries and escalates at the limit", "[keyboard]") {
+        Irq1Silencer quiet {};
+        auto& kb = x86::Dev::Keyboard::device();
+        normalize(kb);
 
-        // Drain replies the suite provoked out of the device, then let
-        // real keystrokes interrupt again
-        while (x86::IO::inb(Drivers::Ps2::STATUS_PORT) & 1) {
-            x86::IO::inb(Drivers::Ps2::DATA_PORT);
-        }
-        x86::System::Irq::irq_unmask(1);
+        // A real nack below the limit resends last_sent to the device and
+        // the ack would race these assertions, so start one short of the
+        // limit: this path goes straight to the controller, no device I/O
+        kb.nack_count = Drivers::Ps2::MAX_RETRY - 1;
+        kb.on_recieve(0xFE);
+        CHECK(kb.signal == Drivers::Ps2::PS2Ack::Error);
+        CHECK(kb.data.is_empty());
 
-        KTest::summary("Keyboard IRQ1");
+        // The escalation disabled port 1; bring it back for the rest of boot
+        kb.write_cmd(Drivers::Ps2::ENABLE_PORT1);
+        kb.nack_count = 0;
+
+        kb.nack_count = 2;
+        kb.on_recieve(0xFA);
+        CHECK(kb.signal == Drivers::Ps2::PS2Ack::Ack);
+        CHECK(kb.nack_count == 0);
+    }
+
+    TEST_CASE("IRQ1 routes through the dispatcher into g_keyboard", "[keyboard]") {
+        Irq1Silencer quiet {};
+        auto& kb = x86::Dev::Keyboard::device();
+        normalize(kb);
+
+        // The data port holds whatever byte is stale, so the buffer may
+        // gain at most one entry; anything more means the routing is wrong
+        x86::System::Irq::hardware_interrupt_dispatch(1, nullptr);
+        CHECK(kb.data.get_size() <= 1);
+        normalize(kb);
     }
 }
