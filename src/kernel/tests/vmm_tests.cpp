@@ -4,15 +4,12 @@
 #include <limine/requests.hpp>
 
 namespace Tests {
-    void run_vmm_tests() {
-        Util::klog("--- VMM Tests ---\n");
-        KTest::reset();
+    TEST_CASE("Vmm::init built the kernel address space", "[vmm]") {
+        REQUIRE(Memory::Vmm::kernel_space.pml4 != nullptr);
+        CHECK(Memory::Vmm::kernel_space.pml4_pa != 0);
+    }
 
-        // kernel_space was set up by init()
-        KTEST_ASSERT(Memory::Vmm::kernel_space.pml4    != nullptr, "kernel_space pml4 is set");
-        KTEST_ASSERT(Memory::Vmm::kernel_space.pml4_pa != 0,       "kernel_space pml4_pa is non-zero");
-
-        // upper half PML4 entries 256-511 should all be present
+    TEST_CASE("all upper half PML4 entries (256-511) are present", "[vmm]") {
         bool upper_half_ok = true;
         for (std::size_t i = 256; i < 512; i++) {
             if (!(Memory::Vmm::kernel_space.pml4->entries[i] & Memory::Vmm::PRESENT)) {
@@ -20,25 +17,28 @@ namespace Tests {
                 break;
             }
         }
-        KTEST_ASSERT(upper_half_ok, "all upper half PML4 entries (256-511) are present");
+        CHECK(upper_half_ok);
+    }
 
-        // HHDM: va_to_pa on a known physical page should recover the physical address
+    TEST_CASE("va_to_pa recovers the physical address behind an HHDM mapping", "[vmm]") {
         std::uint64_t phys = Memory::Pmm::alloc(1);
-        KTEST_ASSERT(phys != 0, "PMM alloc for va_to_pa test succeeded");
+        REQUIRE(phys != 0);
 
-        std::uint64_t hhdm_va = phys + Limine::get_hhdm();
+        std::uint64_t hhdm_va  = phys + Limine::get_hhdm();
         std::uint64_t recovered = Memory::Vmm::va_to_pa(Memory::Vmm::kernel_space, hhdm_va);
-        KTEST_ASSERT(recovered == phys, "va_to_pa recovers correct physical address via HHDM");
+        CHECK(recovered == phys);
 
         Memory::Pmm::free(phys, 1);
+    }
 
-        // HHDM write/read through virtual address
-        std::uint64_t phys2 = Memory::Pmm::alloc(1);
-        auto* vptr = reinterpret_cast<std::uint64_t*>(phys2 + Limine::get_hhdm());
+    TEST_CASE("HHDM virtual addresses are writable", "[vmm]") {
+        std::uint64_t phys = Memory::Pmm::alloc(1);
+        REQUIRE(phys != 0);
+
+        auto* vptr = reinterpret_cast<std::uint64_t*>(phys + Limine::get_hhdm());
         *vptr = 0xDEADBEEFCAFEBABEull;
-        KTEST_ASSERT(*vptr == 0xDEADBEEFCAFEBABEull, "HHDM virtual address is writable");
-        Memory::Pmm::free(phys2, 1);
+        CHECK(*vptr == 0xDEADBEEFCAFEBABEull);
 
-        KTest::summary("VMM");
+        Memory::Pmm::free(phys, 1);
     }
 }

@@ -25,153 +25,152 @@ namespace Tests {
         }
     }
 
-    void deque_tests() {
-        Util::klog("--- Deque Tests ---\n");
-        KTest::reset();
-
+    TEST_CASE("size() tracks pushes and pops", "[deque]") {
         Item a { 1, {} };
         Item b { 2, {} };
         Item c { 3, {} };
         Item d { 4, {} };
 
-        // ── size() tracks pushes and pops ────────────────────────────────────
-        {
-            ItemDeque dq {};
-            KTEST_ASSERT(dq.size() == 0, "fresh deque has size 0");
-            KTEST_ASSERT(dq.empty(),     "fresh deque is empty");
+        ItemDeque dq {};
+        CHECK(dq.size() == 0);
+        CHECK(dq.empty());
 
-            dq.push_tail(&a);
-            dq.push_tail(&b);
-            dq.push_tail(&c);
-            KTEST_ASSERT(dq.size() == 3, "size is 3 after three push_tail");
-            KTEST_ASSERT(!dq.empty(),    "deque is not empty after pushes");
+        dq.push_tail(&a);
+        dq.push_tail(&b);
+        dq.push_tail(&c);
+        CHECK(dq.size() == 3);
+        CHECK_FALSE(dq.empty());
 
-            dq.push_head(&d);
-            KTEST_ASSERT(dq.size() == 4, "push_head also grows size");
+        dq.push_head(&d);
+        CHECK(dq.size() == 4);
 
-            dq.pop_head();
-            KTEST_ASSERT(dq.size() == 3, "pop_head shrinks size");
+        dq.pop_head();
+        CHECK(dq.size() == 3);
 
-            dq.pop_tail();
-            KTEST_ASSERT(dq.size() == 2, "pop_tail shrinks size");
+        dq.pop_tail();
+        CHECK(dq.size() == 2);
 
-            dq.clear_all();
-            KTEST_ASSERT(dq.size() == 0, "clear_all resets size to 0");
-            KTEST_ASSERT(dq.empty(),     "clear_all leaves deque empty");
-        }
+        dq.clear_all();
+        CHECK(dq.size() == 0);
+        CHECK(dq.empty());
+    }
 
-        // ── pop returns the same objects we pushed (identity, not copies) ─────
-        {
-            ItemDeque dq {};
-            dq.push_tail(&a);
-            dq.push_tail(&b);
-            dq.push_tail(&c);
+    TEST_CASE("pop returns the same objects we pushed, not copies", "[deque]") {
+        Item a { 1, {} };
+        Item b { 2, {} };
+        Item c { 3, {} };
 
-            Item* h = dq.pop_head();
-            KTEST_ASSERT(h == &a,    "pop_head returns the exact head pointer");
-            KTEST_ASSERT(h->id == 1, "popped object is unmodified (id intact)");
+        ItemDeque dq {};
+        dq.push_tail(&a);
+        dq.push_tail(&b);
+        dq.push_tail(&c);
 
-            Item* t = dq.pop_tail();
-            KTEST_ASSERT(t == &c,    "pop_tail returns the exact tail pointer");
-            KTEST_ASSERT(t->id == 3, "popped tail object is unmodified");
+        Item* h = dq.pop_head();
+        CHECK(h == &a);
+        CHECK(h->id == 1);
 
-            KTEST_ASSERT(dq.size() == 1,        "one element remains after two pops");
-            KTEST_ASSERT(&*dq.begin() == &b,    "remaining node is the same &b we pushed");
+        Item* t = dq.pop_tail();
+        CHECK(t == &c);
+        CHECK(t->id == 3);
 
-            dq.clear_all();
-        }
+        CHECK(dq.size() == 1);
+        CHECK(&*dq.begin() == &b);
 
-        // ── remove() from the middle keeps the other pointers stable ─────────
-        {
-            ItemDeque dq {};
-            dq.push_tail(&a);
-            dq.push_tail(&b);
-            dq.push_tail(&c);
-            dq.push_tail(&d);
+        dq.clear_all();
+    }
 
-            dq.remove(&b);
-            auto _size = dq.size();
-            KTEST_ASSERT(_size == 3, "remove() of a middle node shrinks size by one");
+    TEST_CASE("remove() from the middle keeps the other pointers stable", "[deque]") {
+        Item a { 1, {} };
+        Item b { 2, {} };
+        Item c { 3, {} };
+        Item d { 4, {} };
 
-            Item* expected[] = { &a, &c, &d };
-            KTEST_ASSERT(order_matches(dq, expected, 3),
-                         "survivors keep their identity and order after middle remove");
-            KTEST_ASSERT(a.id == 1 && c.id == 3 && d.id == 4,
-                         "untouched objects are not mutated by remove()");
+        ItemDeque dq {};
+        dq.push_tail(&a);
+        dq.push_tail(&b);
+        dq.push_tail(&c);
+        dq.push_tail(&d);
 
-            dq.clear_all();
-        }
+        dq.remove(&b);
+        CHECK(dq.size() == 3);
 
-        // ── remove() of the head and tail ends ───────────────────────────────
-        {
-            ItemDeque dq {};
-            dq.push_tail(&a);
-            dq.push_tail(&b);
-            dq.push_tail(&c);
+        Item* expected[] = { &a, &c, &d };
+        CHECK(order_matches(dq, expected, 3));
+        CHECK(a.id == 1 && c.id == 3 && d.id == 4);
 
-            dq.remove(&a); // head
-            Item* after_head[] = { &b, &c };
-            KTEST_ASSERT(dq.size() == 2 && order_matches(dq, after_head, 2),
-                         "removing the head leaves the rest stable");
+        dq.clear_all();
+    }
 
-            dq.remove(&c); // tail
-            Item* after_tail[] = { &b };
-            KTEST_ASSERT(dq.size() == 1 && order_matches(dq, after_tail, 1),
-                         "removing the tail leaves the rest stable");
+    TEST_CASE("remove() of the head and tail ends", "[deque]") {
+        Item a { 1, {} };
+        Item b { 2, {} };
+        Item c { 3, {} };
 
-            dq.remove(&b); // last one
-            KTEST_ASSERT(dq.size() == 0 && dq.empty(),
-                         "removing the final node empties the deque");
+        ItemDeque dq {};
+        dq.push_tail(&a);
+        dq.push_tail(&b);
+        dq.push_tail(&c);
 
-            dq.clear_all();
-        }
+        dq.remove(&a); // head
+        Item* after_head[] = { &b, &c };
+        CHECK(dq.size() == 2 && order_matches(dq, after_head, 2));
 
-        {
-            ItemDeque dq {};
-            dq.push_head(&a);
-            dq.push_head(&b);
-            dq.push_head(&c);
+        dq.remove(&c); // tail
+        Item* after_tail[] = { &b };
+        CHECK(dq.size() == 1 && order_matches(dq, after_tail, 1));
 
-            dq.remove(&a); // head
-            Item* after_head[] = { &c, &b};
-            KTEST_ASSERT(dq.size() == 2 && order_matches(dq, after_head, 2),
-                         "push head test");
+        dq.remove(&b); // last one
+        CHECK(dq.size() == 0 && dq.empty());
 
-            dq.remove(&c); // tail
-            Item* after_tail[] = { &b };
-            KTEST_ASSERT(dq.size() == 1 && order_matches(dq, after_tail, 1),
-                         "push head test");
+        dq.clear_all();
+    }
 
-            dq.remove(&b); // last one
-            KTEST_ASSERT(dq.size() == 0 && dq.empty(),
-                         "push head test");
+    TEST_CASE("remove() walks a push_head-built deque correctly", "[deque]") {
+        Item a { 1, {} };
+        Item b { 2, {} };
+        Item c { 3, {} };
 
-            dq.clear_all();
-        }
+        ItemDeque dq {};
+        dq.push_head(&a);
+        dq.push_head(&b);
+        dq.push_head(&c);
 
-        // tests to make sure that inserting and deleting middle doesn't case pointer issues. 
-        {
-            ItemDeque dq {};
+        dq.remove(&a); // head
+        Item* after_head[] = { &c, &b };
+        CHECK(dq.size() == 2 && order_matches(dq, after_head, 2));
 
-            dq.push_tail(&a);
-            dq.push_tail(&b);
-            dq.push_tail(&c);
+        dq.remove(&c); // tail
+        Item* after_tail[] = { &b };
+        CHECK(dq.size() == 1 && order_matches(dq, after_tail, 1));
 
-            KTEST_ASSERT(dq.size() == 3, "size");
+        dq.remove(&b); // last one
+        CHECK(dq.size() == 0 && dq.empty());
 
-            dq.remove(&b);
-            Item* after_head[] = { &a, &c }; 
+        dq.clear_all();
+    }
 
-            KTEST_ASSERT(dq.size() == 2 && order_matches(dq, after_head, 2),
-                         "removing the middle leaves the rest stable");
-            
-            dq.push_tail(&d);
-            Item* item[] = { &a, &c, &d }; 
-            KTEST_ASSERT(dq.size() == 3 && order_matches(dq, item, 3),
-                         "adding the middle leaves the rest stable");
-            dq.clear_all();
-        }
+    // makes sure that inserting and deleting middle doesn't cause pointer issues
+    TEST_CASE("pushing again after a middle remove keeps the rest stable", "[deque]") {
+        Item a { 1, {} };
+        Item b { 2, {} };
+        Item c { 3, {} };
+        Item d { 4, {} };
 
-        KTest::summary("Deque");
+        ItemDeque dq {};
+        dq.push_tail(&a);
+        dq.push_tail(&b);
+        dq.push_tail(&c);
+
+        REQUIRE(dq.size() == 3);
+
+        dq.remove(&b);
+        Item* after_remove[] = { &a, &c };
+        CHECK(dq.size() == 2 && order_matches(dq, after_remove, 2));
+
+        dq.push_tail(&d);
+        Item* after_push[] = { &a, &c, &d };
+        CHECK(dq.size() == 3 && order_matches(dq, after_push, 3));
+
+        dq.clear_all();
     }
 }
