@@ -25,7 +25,7 @@ namespace Tests {
     namespace {
         void reset_sched() {
             g_scheduler.ready_threads.clear_all();
-            g_scheduler.sleeping_threads.clear_all();
+            g_scheduler.waiting_queue.clear_all();
             g_scheduler.curr_thread          = nullptr;
             g_scheduler.task_switch_counter  = 0;
 
@@ -271,7 +271,7 @@ namespace Tests {
         g_scheduler.sleep(50);
         CHECK(a.state == Thread::ThreadState::Sleep);
         CHECK(a.ticks_left == 50);
-        CHECK_FALSE(g_scheduler.sleeping_threads.empty());
+        CHECK_FALSE(g_scheduler.waiting_queue.empty());
         // NOTE: sleep() does not call schedule(), so the sleeper is still the
         // current thread and keeps running until the next PIT tick rotates
         // it out. Worth revisiting if you want sleep() to yield immediately.
@@ -296,7 +296,7 @@ namespace Tests {
 
         g_scheduler.sleep(50);                             // 50 > 0 -> early return
         CHECK(a.state == Thread::ThreadState::Running);
-        CHECK(g_scheduler.sleeping_threads.empty());
+        CHECK(g_scheduler.waiting_queue.empty());
 
         Drivers::Pit::pit_clocks = saved_clocks;
     }
@@ -314,7 +314,7 @@ namespace Tests {
 
         sleeper.state      = Thread::ThreadState::Sleep;
         sleeper.ticks_left = 3;
-        g_scheduler.sleeping_threads.push_tail(&sleeper);
+        g_scheduler.waiting_queue.push_tail(&sleeper);
 
         x86::ArchIrq::IrqFrame frame {};
         g_scheduler.pit_irq_handler(&frame);

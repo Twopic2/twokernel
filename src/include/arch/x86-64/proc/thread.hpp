@@ -37,7 +37,9 @@ namespace x86::Proc::Thread {
         Ready,
         Running,
 		Blocked,
-        Zombie
+        Sleep,
+        Zombie,
+        Dead
     };
 
     using FuncPtr = void (*)(void*);   

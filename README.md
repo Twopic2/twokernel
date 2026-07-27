@@ -39,8 +39,8 @@ https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
 - [x] Context switch in asm (save/restore GPRs, RFLAGS, RIP, RSP)
 - [x] Ready queue + round-robin scheduler
 - [x] Timer-driven preemption (PIC timer ISR → `schedule()`)
-- [?] `sleep`/wait queues, blocking primitives
-- [?] Idle thread
+- [x] `sleep`/wait queues, blocking primitives
+- [x] Idle thread
 
 ## 06 — Userspace
 - [ ] User CS/DS/TSS in GDT, IST stacks

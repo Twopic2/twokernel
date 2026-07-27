@@ -79,8 +79,8 @@ namespace x86::Proc::Scheduler {
 
         curr_thread->registers = *frame;
 
-        if (!sleeping_threads.empty()) {
-            auto* sleep_thread = sleeping_threads.pop_head();
+        if (!waiting_queue.empty()) {
+            auto* sleep_thread = waiting_queue.pop_head();
 
             if (sleep_thread->ticks_left != 0) {
                 sleep_thread->ticks_left--;
@@ -90,7 +90,7 @@ namespace x86::Proc::Scheduler {
                 unblock(sleep_thread);
             }
 
-            sleeping_threads.push_tail(sleep_thread);
+            waiting_queue.push_tail(sleep_thread);
         }
 
         /* 
@@ -119,10 +119,18 @@ namespace x86::Proc::Scheduler {
             return;
         }
 
+   /*      if (idle_thread) {
+
+        } */
+
+        if (ready_threads.empty()) {
+            switch_task(*idle_thread);
+        }
+
         if (!ready_threads.empty() && !curr_thread) {
             curr_thread = ready_threads.pop_head();
             switch_task(*curr_thread);
-        } 
+        }       
 
         auto next_thread = ready_threads.pop_head();
         next_thread->state = Thread::ThreadState::Running;
@@ -155,7 +163,7 @@ namespace x86::Proc::Scheduler {
 
         curr_thread->ticks_left = time;
         curr_thread->state = Thread::ThreadState::Sleep;
-        sleeping_threads.push_tail(curr_thread);
+        waiting_queue.push_tail(curr_thread);
 
         unlock_scheduler();
     }
@@ -175,7 +183,7 @@ namespace x86::Proc::Scheduler {
         lock_scheduler();
 
         curr_thread->state = Thread::ThreadState::Sleep;
-        sleeping_threads.push_tail(curr_thread);
+        waiting_queue.push_tail(curr_thread);
 
         schedule();
         unlock_scheduler();
@@ -197,10 +205,4 @@ namespace x86::Proc::Scheduler {
         ready_threads.push_tail(task);
         unlock_scheduler();
     }
-
-    /* void Schedule::set_idle_thread() {
-        while (true) {
-            
-        }
-    } */
 }
