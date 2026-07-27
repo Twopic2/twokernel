@@ -119,18 +119,10 @@ namespace x86::Proc::Scheduler {
             return;
         }
 
-   /*      if (idle_thread) {
-
-        } */
-
-        if (ready_threads.empty()) {
-            switch_task(*idle_thread);
-        }
-
         if (!ready_threads.empty() && !curr_thread) {
             curr_thread = ready_threads.pop_head();
             switch_task(*curr_thread);
-        }       
+        } 
 
         auto next_thread = ready_threads.pop_head();
         next_thread->state = Thread::ThreadState::Running;
