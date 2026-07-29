@@ -129,6 +129,9 @@ namespace Memory::Vmm {
 
         if (allocate) {
             std::uint64_t new_pa = Pmm::alloc(1);
+            if (new_pa == 0) {
+                Util::klog_panic("Pmm::alloc(1) failed in get_next_level() -- out of physical memory\n");
+            }
             PageMap* next_level = reinterpret_cast<PageMap*>(new_pa + Limine::get_hhdm());
 
             LibC::memset(next_level->entries.data(), 0, PAGE_SIZE);
@@ -163,6 +166,9 @@ namespace Memory::Vmm {
         // Util::klog("kernel_space upper half vaddress init\n");        
         for (std::size_t i = 256; i < 512; i++) {
             std::uint64_t pdpt_pa = Pmm::alloc(1);
+            if (pdpt_pa == 0) {
+                Util::klog_panic("Pmm::alloc(1) failed in fill_kernel_entries() -- out of physical memory\n");
+            }
             auto* pdpt = reinterpret_cast<PageMap*>(pdpt_pa + Limine::get_hhdm());
             LibC::memset(pdpt->entries.data(), 0, sizeof(pdpt->entries));
             asm volatile("sfence" : : : "memory"); // Ensure zeroing is visible before entry is set.

@@ -55,6 +55,15 @@ namespace Limine {
         .response = nullptr
     };
 
+    [[gnu::used, gnu::section(".limine_requests")]]
+    inline volatile limine_stack_size_request stack_size
+    {
+        .id = LIMINE_STACK_SIZE_REQUEST_ID,
+        .revision = 0,
+        .response = nullptr,
+        .stack_size = 0x100000
+    };
+
      // write into or read from a physical address
     inline std::uint64_t get_hhdm() {
         return Limine::hhdm.response->offset; 

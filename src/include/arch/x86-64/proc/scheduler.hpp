@@ -4,6 +4,7 @@
 #include "arch/x86-64/proc/process.hpp"
 #include "arch/x86-64/proc/thread.hpp"
 #include "memory/vmm.hpp"
+#include <cstddef>
 #include <cstdint>
 
 /// TODO: When I manage to set up SMP. The Cpu will handle scheduling rather than the Kernel. 
@@ -47,7 +48,7 @@
 namespace x86::Proc::Scheduler {
     inline void set_idle(void*) {
         while (true) {
-            asm volatile ("sti; hlt");
+            asm volatile("hlt");
         }
     }
 
@@ -67,7 +68,7 @@ namespace x86::Proc::Scheduler {
         void unblock(Thread::ThreadBlock* task);       
         Thread::ThreadBlock* get_current_thread(); 
         void add_ready_threads(Thread::ThreadBlock* thread);
-        void switch_task(Thread::ThreadBlock& next_thread);
+        void switch_task(Thread::ThreadBlock* next_thread);
 
         void yield();
         void sleep(std::uint64_t ns);
@@ -77,10 +78,12 @@ namespace x86::Proc::Scheduler {
         void reschedule();
         
         Schedule(Thread::ThreadBlock* idle) {
+            idle->state = Thread::ThreadState::Running;
             idle_thread = idle;
         }
     };
 
-    static inline Thread::ThreadBlock global_idle  {"idle", nullptr, set_idle};
+    inline Process::ProcessBlock global_process {"kernel", false};
+    inline Thread::ThreadBlock global_idle  {"idle", &global_process, set_idle, nullptr};
     inline struct Schedule g_scheduler {&global_idle};
 }

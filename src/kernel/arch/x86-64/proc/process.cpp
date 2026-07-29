@@ -6,11 +6,12 @@
 #include <cstdint>
 
 namespace x86::Proc::Process {
-    ProcessBlock::ProcessBlock(std::string_view name, FuncPtr entry) :
-    m_entry(entry), m_name(name) {
+    ProcessBlock::ProcessBlock(std::string_view name, bool user) :
+    is_user(user), m_name(name) {
        // Util::IrqGaurd irq {};
         vaddr = Memory::Vmm::new_pagemap();
         Memory::Vmm::process_fill_kernel_entries(vaddr);
+        status = ProcStats::Ready;
         total_pid++;
         pid = total_pid;
     }

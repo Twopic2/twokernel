@@ -79,13 +79,25 @@ namespace Memory::Vmm {
         return vaddr;
     }
 
-    static inline VAddressSpace new_pagemap() {
+    inline VAddressSpace new_pagemap() {
         std::uint64_t pa = Pmm::alloc(1);
+        if (pa == 0) {
+            Util::klog_panic("Pmm::alloc(1) failed in new_pagemap() -- out of physical memory\n");
+            return VAddressSpace {0, 0};
+        }
 
         PageMap* pml4 = reinterpret_cast<PageMap*>(pa + Limine::hhdm.response->offset);
         LibC::memset(pml4->entries.data(), 0, sizeof(pml4->entries));
 
         return VAddressSpace{ .pml4 = pml4, .pml4_pa = pa };
+    }
+
+    inline void free_pagemap(std::uint64_t pa) {
+        if (pa == 0) {
+            Util::klog_panic("Pmm::alloc(1) failed in new_pagemap() -- out of physical memory\n");
+            return;
+        }
+        Pmm::free(pa, 1);
     }
 
     PageMap* get_next_level(struct PageMap& entry, std::size_t index, std::uint64_t flags, bool allocates);

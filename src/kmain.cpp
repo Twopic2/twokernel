@@ -21,6 +21,9 @@ extern "C" void kmain() {
     // Ensures the proper base revision (see spec).
     Limine::base_revision_check();
 
+    Memory::Pmm::init_pmm();
+    Memory::Vmm::init();
+
     CxxRuntime::run_global_ctors();
 
     if (Limine::framebuffer_request.response == NULL
@@ -42,24 +45,20 @@ extern "C" void kmain() {
         x86::exception_load();
     }
 
-    Memory::Pmm::init_pmm();
-    Memory::Vmm::init();
+   // KTest::run("[pmm]");
+    //KTest::run("[vmm]");
 
-    KTest::run("[pmm]");
-    KTest::run("[vmm]");
+    KTest::run("[scheduler]");
 
-   // KTest::run("[scheduler]");
+     x86::Dev::Timer::timer_init();
 
-    x86::Dev::Timer::timer_init();
+     x86::Dev::Keyboard::keyboard_init();
 
-    x86::Dev::Keyboard::keyboard_init();
-
-    KTest::run("[deque]");
+//    KTest::run("[deque]");
 
     //KTest::run("[keyboard]");
     //KTest::run("[irq]");
     //KTest::run("[ringbuffer]");
 
     // Once we finish we halt
-    CxxRuntime::hcf();
 }

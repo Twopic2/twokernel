@@ -119,29 +119,35 @@ namespace x86::Proc::Scheduler {
             return;
         }
 
-        if (!ready_threads.empty() && !curr_thread) {
-            curr_thread = ready_threads.pop_head();
-            switch_task(*curr_thread);
-        } 
+        if (ready_threads.empty()){
+            switch_task(idle_thread);
+            return;
+        }
 
         auto next_thread = ready_threads.pop_head();
         next_thread->state = Thread::ThreadState::Running;
 
-        switch_task(*next_thread);
+        switch_task(next_thread);
     }
 
-    void Schedule::switch_task(Thread::ThreadBlock& next_thread) {
+    void Schedule::switch_task(Thread::ThreadBlock* next_thread) {
         //Util::dump_registers("current thread before context switch", curr_thread->registers);
-        Schedule::add_ready_threads(curr_thread);
-        System::Gdt::tss.rsp0 = reinterpret_cast<std::uint64_t>(next_thread.rsp0);
+        if (curr_thread->state == Thread::ThreadState::Running && curr_thread != idle_thread) { 
+            Schedule::add_ready_threads(curr_thread);
+        }
 
-        if (next_thread.m_process != curr_thread->m_process) {
-            Memory::Vmm::load_cr3(next_thread.m_process->vaddr.pml4_pa);
-            curr_thread = &next_thread;
+        if (next_thread == idle_thread) {
+            curr_thread = next_thread;
             return;
         }
 
-        curr_thread = &next_thread;
+        System::Gdt::tss.rsp0 = reinterpret_cast<std::uint64_t>(next_thread->rsp0);
+
+        if (next_thread->m_process != curr_thread->m_process) {
+            Memory::Vmm::load_cr3(next_thread->m_process->vaddr.pml4_pa);
+        }
+
+        curr_thread = next_thread;
       //  Util::dump_registers("next thread after context switch", next_thread.registers);
     }
 
@@ -164,6 +170,7 @@ namespace x86::Proc::Scheduler {
         lock_scheduler();
 
         curr_thread->state = Thread::ThreadState::Ready;
+        curr_thread->reset();
         ready_threads.push_tail(curr_thread);
 
         Schedule::schedule();
@@ -174,7 +181,7 @@ namespace x86::Proc::Scheduler {
     void Schedule::block() {
         lock_scheduler();
 
-        curr_thread->state = Thread::ThreadState::Sleep;
+        curr_thread->state = Thread::ThreadState::Blocked;
         waiting_queue.push_tail(curr_thread);
 
         schedule();
@@ -190,7 +197,7 @@ namespace x86::Proc::Scheduler {
         lock_scheduler();
 
         if (ready_threads.empty()) {
-            Schedule::switch_task(*task);
+            Schedule::switch_task(task);
         }
 
         task->state = Thread::ThreadState::Ready;

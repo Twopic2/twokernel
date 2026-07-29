@@ -23,6 +23,18 @@ namespace Tests {
     }
 
     namespace {
+        // idle_thread is one real, permanently-shared object now (no more
+        // per-TU copies once global_idle lost `static`) -- any test that
+        // ticks or switches through it mutates its saved registers/
+        // ticks_left/state for real (pit_irq_handler overwrites registers
+        // wholesale), and none of that was ever undone. It silently leaked
+        // into every test that ran afterward. Capture it clean once, before
+        // any test has touched it, and restore from that snapshot every time.
+        Thread::ThreadBlock& idle_pristine_snapshot() {
+            static Thread::ThreadBlock snapshot = *g_scheduler.idle_thread;
+            return snapshot;
+        }
+
         void reset_sched() {
             g_scheduler.ready_threads.clear_all();
             g_scheduler.waiting_queue.clear_all();
@@ -31,6 +43,8 @@ namespace Tests {
 
             g_scheduler.disable_counter      = 0;
             g_scheduler.task_switch_postponed = false;
+
+            *g_scheduler.idle_thread = idle_pristine_snapshot();
         }
 
         // Every add_ready_threads()/switch_task() crossing leaves CR3 pointing
@@ -228,11 +242,14 @@ namespace Tests {
         a.state = Thread::ThreadState::Running;
         b.state = Thread::ThreadState::Ready;
         g_scheduler.ready_threads.push_tail(&b);
+        CHECK(g_scheduler.ready_threads.size() == 1);
 
         g_scheduler.yield();
         CHECK(g_scheduler.curr_thread == &b);
         CHECK(b.state == Thread::ThreadState::Running);
         CHECK(a.state == Thread::ThreadState::Ready);
+        CHECK(g_scheduler.ready_threads.size() == 1);
+
         CHECK(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(b.rsp0));
 
         // The lock/postpone dance must net out: yield returns fully unlocked
@@ -404,5 +421,109 @@ namespace Tests {
         CHECK(cr3_tracks_process);
         // process A's quantum is being spent across the ticks
         CHECK(ta.ticks_left < Thread::TIME_SLICE_MS);
+    }
+
+    // A single thread that blocks with nothing else ready must hand the CPU
+    // to idle -- there's nothing left runnable, so idle is the only valid
+    // choice. curr_thread is set directly (not via add_ready_threads, which
+    // on an empty queue also leaves the thread sitting in ready_threads --
+    // block() would then find ready_threads non-empty and never reach idle).
+    TEST_CASE("Checking for idle threads when the ready queue is empty", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+
+        g_scheduler.curr_thread = &a;
+        a.state = Thread::ThreadState::Running;
+
+        g_scheduler.block();
+
+        CHECK(g_scheduler.curr_thread == g_scheduler.idle_thread);
+        CHECK(a.state == Thread::ThreadState::Blocked);
+        CHECK_FALSE(g_scheduler.waiting_queue.empty());
+    }
+
+    // idle is a fallback CPU state, not a schedulable entity -- it must never
+    // show up in ready_threads, even after being switched to.
+    TEST_CASE("idle is never enqueued in ready_threads", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+
+        g_scheduler.curr_thread = &a;
+        a.state = Thread::ThreadState::Running;
+
+        g_scheduler.block();
+        REQUIRE(g_scheduler.curr_thread == g_scheduler.idle_thread);
+
+        for (auto& t : g_scheduler.ready_threads) {
+            CHECK(&t != g_scheduler.idle_thread);
+        }
+    }
+
+    // The blocked thread must not be dropped on the floor when the CPU
+    // switches to idle -- it has to stay reachable (in waiting_queue) so
+    // unblock() can find it later.
+    TEST_CASE("the outgoing thread survives the switch to idle", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+
+        g_scheduler.curr_thread = &a;
+        a.state = Thread::ThreadState::Running;
+
+        g_scheduler.block();
+        REQUIRE(g_scheduler.curr_thread == g_scheduler.idle_thread);
+
+        bool found = false;
+        for (auto& t : g_scheduler.waiting_queue) {
+            if (&t == &a) found = true;
+        }
+        CHECK(found);
+    }
+
+    // Once idle is resident, waking the only other thread must take the CPU
+    // back -- idle should never keep running once real work is ready.
+    TEST_CASE("unblock() takes the CPU back from idle", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+
+        g_scheduler.curr_thread = &a;
+        a.state = Thread::ThreadState::Running;
+        g_scheduler.block();
+        REQUIRE(g_scheduler.curr_thread == g_scheduler.idle_thread);
+
+        CHECK(g_scheduler.ready_threads.empty() == true);
+        g_scheduler.unblock(&a);
+
+        CHECK(g_scheduler.curr_thread == &a);
+        CHECK(a.state == Thread::ThreadState::Ready);
+}
+
+    // A PIT tick that fires while idle is already resident and nothing new
+    // is ready should leave the CPU parked on idle, not wander off or crash
+    // on a redundant self-switch.
+    TEST_CASE("PIT ticks while idle is resident are a no-op", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Thread::ThreadBlock a {}; 
+        a.m_name = "a"; 
+        a.m_process = &kproc;
+
+        g_scheduler.curr_thread = &a;
+        a.state = Thread::ThreadState::Running;
+        g_scheduler.block();
+        REQUIRE(g_scheduler.curr_thread == g_scheduler.idle_thread);
+
+        x86::ArchIrq::IrqFrame frame {};
+        g_scheduler.pit_irq_handler(&frame);
+
+        CHECK(g_scheduler.curr_thread == g_scheduler.idle_thread);
     }
 }

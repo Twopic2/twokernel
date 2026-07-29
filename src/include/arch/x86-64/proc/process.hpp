@@ -20,24 +20,13 @@ to things like file handles. All of this information is stored in a process cont
 //* I'm going to try and get some better PF errors
 
 namespace x86::Proc::Process {
-    
-    /* 
-    READY: The process is runnable, and can be executed.
-    RUNNING: The process is currently running.
-    DEAD: The process has finished executing, and can have its resources cleaned up. 
-
-    Blocked: In the blocked state, a process has performed some kind
-    of operation that makes it not ready to run until some other event
-    takes place. A common example: when a process initiates an I/O
-    request to a disk, it becomes blocked and thus some other process
-    can use the processor.
-    */
-
     enum class ProcStats : std::uint8_t {
         Ready,
         Running,
-        Blocked,
+		Blocked,
+        Sleep,
         Zombie,
+        Dead
     };
 
     using FuncPtr = void(*)(void*);
@@ -50,12 +39,14 @@ namespace x86::Proc::Process {
         Memory::Vmm::VAddressSpace vaddr;
         
         ProcStats status; 
-        FuncPtr m_entry;
+        bool is_user;
         std::string_view m_name;
         std::uint16_t pid;
         std::uint8_t thread_size {};
 
-        ProcessBlock(std::string_view name, FuncPtr entry);
+        // TODO: Make sure to update a proper user Vmem where 
+        // It allocates a VMem region (0x200000 to 0x7FFFFFFFE000) for virtual memory management
+        ProcessBlock(std::string_view name, bool user);
         ProcessBlock();
 
         void add_thread(Thread::ThreadBlock* thread);

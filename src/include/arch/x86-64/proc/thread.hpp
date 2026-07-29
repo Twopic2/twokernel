@@ -70,11 +70,11 @@ namespace x86::Proc::Thread {
         kstd::SingleNode proc_hook {};
 
         void exit();
-
+        void reset();
         void init_kernel_stack();
 
         // Basically the create_kernel_task inside Brendan's Multi-taskng Tutorial
-        ThreadBlock(std::string_view name, Process::ProcessBlock* process, FuncPtr entry);
+        ThreadBlock(std::string_view name, Process::ProcessBlock* process, FuncPtr entry, void* args);
         ThreadBlock();
     };  
 }
