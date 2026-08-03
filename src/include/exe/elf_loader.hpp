@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include "elf.hpp"
+#include "memory/vmm.hpp"
 
 /* 
     ! Elf Object 
@@ -19,7 +21,7 @@
 
 /* Credit to @Qwinci 
 https://github.com/Qwinci/crescent/blob/main/src/exe/elf_loader.hpp */
-namespace Exe::ElfLoader {
+namespace Exe::Elf {
     struct LoadedElf {
         void (*entry)(void*);
         std::size_t base;
@@ -33,5 +35,8 @@ namespace Exe::ElfLoader {
         NoMemory
     };
 
-    std::expected<LoadedElf, ElfLoadError> elf_load();
+    bool elf_check_file(const Elf64_Header& elf_hdr);
+    bool elf_check_supported(const Elf64_Header& elf_hdr);
+    
+    std::expected<LoadedElf, ElfLoadError> elf_load(const void* data, std::size_t size, Memory::Vmm::VAddressSpace& space);
 }

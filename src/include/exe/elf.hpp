@@ -2,7 +2,6 @@
 
 #include <cstdint>
 
-
 /*
     ! ELF Overview
 
@@ -35,11 +34,33 @@ namespace Exe::Elf {
 	inline constexpr std::uint16_t ELFMACHINE = 0x3e;
     inline constexpr std::size_t EI_NIDENT = 16;
 
+	/* 
+		! EI0-3 
+	*/
+	inline constexpr std::uint8_t ELFMAG0 = 0x7F;
+	inline constexpr std::uint8_t ELFMAG1 = 'E';
+	inline constexpr std::uint8_t ELFMAG2 = 'L';
+	inline constexpr std::uint8_t ELFMAG3 = 'F';
+
+	// ! EI4
+	inline constexpr std::uint8_t ELFCLASS32 = 1;
+	inline constexpr std::uint8_t ELFCLASS64 = 2;
+
+	// ! EI5
+	inline constexpr std::uint8_t ELFDATA2LSB = 1;
+	inline constexpr std::uint8_t ELFDATA2MSB = 2;
+
+	// ! EI6
+	inline constexpr std::uint8_t EV_CURRENT = 1;
+
+	inline constexpr std::uint8_t PF_X = 0x1;
+	inline constexpr std::uint8_t PF_W = 0x2;
+	inline constexpr std::uint8_t PF_R = 0x4;
+
     enum class ElfType : std::uint16_t {
         None = 0,
         Rel = 1,
         Exec = 2,
-        Dyn = 3 
     };
 
 	enum class ProgramType : std::uint32_t {
@@ -48,8 +69,20 @@ namespace Exe::Elf {
         Dynamic = 2,
 	};
 
+    // ? marcos are awful
+	inline constexpr std::uint8_t EI_MAG0 = 0;
+	inline constexpr std::uint8_t EI_MAG1 = 1;
+	inline constexpr std::uint8_t EI_MAG2 = 2;
+	inline constexpr std::uint8_t EI_MAG3 = 3;
+	inline constexpr std::uint8_t EI_CLASS = 4;
+    inline constexpr std::uint8_t EI_DATA = 5;
+	inline constexpr std::uint8_t EI_VERSION = 6; 
+	inline constexpr std::uint8_t EI_OSABI	= 7; 
+	inline constexpr std::uint8_t EI_ABIVERSION	= 8; 
+	inline constexpr std::uint8_t EI_PAD = 9;
+
     struct Elf64_Header {
-        unsigned char e_ident[EI_NIDENT];
+        std::uint8_t e_ident[EI_NIDENT];
         ElfType e_type;
         std::uint16_t e_machine;
         std::uint32_t e_version;
