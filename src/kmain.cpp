@@ -60,5 +60,7 @@ extern "C" void kmain() {
     //KTest::run("[irq]");
     //KTest::run("[ringbuffer]");
 
+     KTest::run("[elf]"); 
+
     // Once we finish we halt
 }

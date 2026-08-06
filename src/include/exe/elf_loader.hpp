@@ -23,7 +23,7 @@
 https://github.com/Qwinci/crescent/blob/main/src/exe/elf_loader.hpp */
 namespace Exe::Elf {
     struct LoadedElf {
-        void (*entry)(void*);
+        std::uint64_t entry;
         std::size_t base;
         std::size_t phdrs_addr;
         std::uint16_t phdr_count;

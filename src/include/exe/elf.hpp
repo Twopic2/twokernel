@@ -75,7 +75,7 @@ namespace Exe::Elf {
 	inline constexpr std::uint8_t EI_MAG2 = 2;
 	inline constexpr std::uint8_t EI_MAG3 = 3;
 	inline constexpr std::uint8_t EI_CLASS = 4;
-    inline constexpr std::uint8_t EI_DATA = 5;
+  	inline constexpr std::uint8_t EI_DATA = 5;
 	inline constexpr std::uint8_t EI_VERSION = 6; 
 	inline constexpr std::uint8_t EI_OSABI	= 7; 
 	inline constexpr std::uint8_t EI_ABIVERSION	= 8; 

@@ -18,10 +18,6 @@ namespace Tests {
     namespace {
         using namespace Exe;
 
-        std::uint8_t ident(const Elf::Elf64_Header& header, Elf::ElfIdent field) {
-            return header.e_ident[static_cast<std::size_t>(field)];
-        }
-
         bool validate_header(const void* data, std::size_t size) {
             if (size < sizeof(Elf::Elf64_Header)) {
                 return false;
@@ -29,20 +25,20 @@ namespace Tests {
 
             const auto& header = *static_cast<const Elf::Elf64_Header*>(data);
 
-            if (ident(header, Elf::ElfIdent::EI_MAG0) != Elf::ELFMAG0
-                || ident(header, Elf::ElfIdent::EI_MAG1) != Elf::ELFMAG1
-                || ident(header, Elf::ElfIdent::EI_MAG2) != Elf::ELFMAG2
-                || ident(header, Elf::ElfIdent::EI_MAG3) != Elf::ELFMAG3) {
+            if (header.e_ident[Elf::EI_MAG0] != Elf::ELFMAG0
+                || header.e_ident[Elf::EI_MAG1] != Elf::ELFMAG1
+                || header.e_ident[Elf::EI_MAG2] != Elf::ELFMAG2
+                || header.e_ident[Elf::EI_MAG3] != Elf::ELFMAG3) {
                 return false;
             }
 
-            if (ident(header, Elf::ElfIdent::EI_CLASS) != Elf::ELFCLASS64) {
+            if (header.e_ident[Elf::EI_CLASS] != Elf::ELFCLASS64) {
                 return false;
             }
-            if (ident(header, Elf::ElfIdent::EI_DATA) != Elf::ELFDATA2LSB) {
+            if (header.e_ident[Elf::EI_DATA] != Elf::ELFDATA2LSB) {
                 return false;
             }
-            if (ident(header, Elf::ElfIdent::EI_VERSION) != Elf::EV_CURRENT) {
+            if (header.e_ident[Elf::EI_VERSION] != Elf::EV_CURRENT) {
                 return false;
             }
             if (header.e_machine != Elf::ELFMACHINE) {
@@ -113,13 +109,13 @@ namespace Tests {
             TestImage image {};
             auto& header = image.header;
 
-            header.e_ident[static_cast<std::size_t>(Elf::ElfIdent::EI_MAG0)] = Elf::ELFMAG0;
-            header.e_ident[static_cast<std::size_t>(Elf::ElfIdent::EI_MAG1)] = Elf::ELFMAG1;
-            header.e_ident[static_cast<std::size_t>(Elf::ElfIdent::EI_MAG2)] = Elf::ELFMAG2;
-            header.e_ident[static_cast<std::size_t>(Elf::ElfIdent::EI_MAG3)] = Elf::ELFMAG3;
-            header.e_ident[static_cast<std::size_t>(Elf::ElfIdent::EI_CLASS)] = Elf::ELFCLASS64;
-            header.e_ident[static_cast<std::size_t>(Elf::ElfIdent::EI_DATA)] = Elf::ELFDATA2LSB;
-            header.e_ident[static_cast<std::size_t>(Elf::ElfIdent::EI_VERSION)] = Elf::EV_CURRENT;
+            header.e_ident[Elf::EI_MAG0] = Elf::ELFMAG0;
+            header.e_ident[Elf::EI_MAG1] = Elf::ELFMAG1;
+            header.e_ident[Elf::EI_MAG2] = Elf::ELFMAG2;
+            header.e_ident[Elf::EI_MAG3] = Elf::ELFMAG3;
+            header.e_ident[Elf::EI_CLASS] = Elf::ELFCLASS64;
+            header.e_ident[Elf::EI_DATA] = Elf::ELFDATA2LSB;
+            header.e_ident[Elf::EI_VERSION] = Elf::EV_CURRENT;
 
             header.e_type = Elf::ElfType::Exec;
             header.e_machine = Elf::ELFMACHINE;
@@ -159,25 +155,25 @@ namespace Tests {
 
     TEST_CASE("a bad magic number is rejected", "[elf]") {
         auto image = make_valid_image();
-        image.header.e_ident[static_cast<std::size_t>(Elf::ElfIdent::EI_MAG0)] = 0x7E;
+        image.header.e_ident[Elf::EI_MAG0] = 0x7E;
         CHECK_FALSE(validate_header(&image, sizeof(image)));
     }
 
     TEST_CASE("a 32-bit class is rejected", "[elf]") {
         auto image = make_valid_image();
-        image.header.e_ident[static_cast<std::size_t>(Elf::ElfIdent::EI_CLASS)] = Elf::ELFCLASS32;
+        image.header.e_ident[Elf::EI_CLASS] = Elf::ELFCLASS32;
         CHECK_FALSE(validate_header(&image, sizeof(image)));
     }
 
     TEST_CASE("a big-endian image is rejected", "[elf]") {
         auto image = make_valid_image();
-        image.header.e_ident[static_cast<std::size_t>(Elf::ElfIdent::EI_DATA)] = Elf::ELFDATA2MSB;
+        image.header.e_ident[Elf::EI_DATA] = Elf::ELFDATA2MSB;
         CHECK_FALSE(validate_header(&image, sizeof(image)));
     }
 
     TEST_CASE("a bad ident version is rejected", "[elf]") {
         auto image = make_valid_image();
-        image.header.e_ident[static_cast<std::size_t>(Elf::ElfIdent::EI_VERSION)] = 0;
+        image.header.e_ident[Elf::EI_VERSION] = 0;
         CHECK_FALSE(validate_header(&image, sizeof(image)));
     }
 
