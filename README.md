@@ -46,7 +46,7 @@ https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
 - [x] User CS/DS/TSS in GDT, IST stacks
 - [x] Per-process address space (clone kernel-half PML4 entries into new pagemap)
 - [x] User page mapping flags (USER bit) in VMM
-- [ ] ELF64 loader (program headers → mmap into address space)
+- [x] ELF64 loader (program headers → mmap into address space)
 - [ ] `iretq`-based ring 3 entry
 - [ ] Syscall entry: SYSCALL/SYSRET, MSR setup (STAR/LSTAR/SFMASK)
 - [ ] Initial syscall set (write, exit, getpid, mmap, brk)
