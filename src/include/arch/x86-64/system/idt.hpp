@@ -30,11 +30,14 @@ namespace x86::System::Idt {
 
     extern "C" void* irq_stubs[];
 
-    constexpr std::uint8_t code = 0x08;
-    constexpr std::uint8_t data = 0x10;
-    constexpr std::size_t idt_vector {256};
+    constexpr std::uint8_t KERNEL_CODE = 0x08;
+    constexpr std::uint8_t KERNEL_DATA = 0x10;
+    constexpr std::uint8_t USER_CODE = 0x18;
+    constexpr std::uint8_t USER_DATA = 0x20;
 
-    inline std::array<IdtEntry, idt_vector> idt_table;
+    constexpr std::size_t IDT_VECTOR {256};
+
+    inline std::array<IdtEntry, IDT_VECTOR> idt_table;
 
     void set_idt_entries(std::uint8_t index, void* handler, std::uint8_t ist, std::uint8_t dpl, std::uint8_t type = 0xE);
 

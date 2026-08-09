@@ -60,7 +60,7 @@ namespace x86::System::Idt {
         entry.offset1 = static_cast<std::uint16_t>(address >> 16);
         entry.offset2 = static_cast<std::uint32_t>(address >> 32);
 
-        entry.selector = code;
+        entry.selector = KERNEL_CODE;
         entry.ist_flags = (ist & 0b111) | (type << 8) | (dpl & 0b11) << 13 | 1 << 15;
     }
 

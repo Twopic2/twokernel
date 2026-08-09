@@ -44,7 +44,6 @@ namespace x86::Proc::Process {
         std::uint16_t pid;
         std::uint8_t thread_size {};
 
-        // TODO: Make sure to update a proper user Vmem where 
         // It allocates a VMem region (0x200000 to 0x7FFFFFFFE000) for virtual memory management
         ProcessBlock(std::string_view name, bool user);
         ProcessBlock();

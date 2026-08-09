@@ -3,6 +3,11 @@
 #include <cstdint>
 #include <std/cstdint>
 
+/*  
+    ! Iretq popping
+    rip, cs, rflags, rsp, ss
+*/
+
 namespace x86::ArchIrq {
     struct IrqFrame {
         std::uint64_t r15, r14, r13, r12, r11, r10, r9, r8;

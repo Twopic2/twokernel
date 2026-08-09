@@ -15,8 +15,15 @@ namespace x86::Proc::Thread {
 
         ticks_left = TIME_SLICE_MS;
         state = ThreadState::Ready;
-        registers.cs = System::Idt::code;
-        registers.ss = System::Idt::data;
+        
+        if (process->is_user) {
+            registers.cs = System::Idt::USER_CODE | 3;
+            registers.ss = System::Idt::USER_DATA | 3;   
+        } else {
+            registers.cs = System::Idt::KERNEL_CODE;
+            registers.ss = System::Idt::KERNEL_DATA;
+        }
+            
         registers.rflags = SET_RFLAGS;
         registers.rip = reinterpret_cast<std::uint64_t>(entry);
 
@@ -24,13 +31,14 @@ namespace x86::Proc::Thread {
         thread_id = total_tid;
     }
 
+    /* Default kernel thread */
     ThreadBlock::ThreadBlock() {
         init_kernel_stack();
 
         ticks_left = TIME_SLICE_MS;
         state = ThreadState::Ready;
-        registers.cs = System::Idt::code;
-        registers.ss = System::Idt::data;
+        registers.cs = System::Idt::KERNEL_CODE;
+        registers.ss = System::Idt::KERNEL_DATA;
         registers.rflags = SET_RFLAGS;
 
         total_tid++;

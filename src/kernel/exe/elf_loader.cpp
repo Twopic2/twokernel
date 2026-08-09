@@ -1,4 +1,5 @@
 #include"exe/elf_loader.hpp"
+#include "arch/x86-64/proc/process.hpp"
 #include "exe/elf.hpp"
 #include "libc/string.hpp"
 #include "memory/pmm.hpp"
@@ -6,6 +7,8 @@
 #include "util/align.hpp"
 #include <cstddef>
 #include <cstdint>
+
+using namespace x86::Proc::Process;
 
 namespace Exe::Elf {
     bool elf_check_file(const Elf64_Header& elf_hdr) {
@@ -61,7 +64,7 @@ namespace Exe::Elf {
     } 
     
     // TODO make sure to add Process and VFS
-    std::expected<LoadedElf, ElfLoadError> elf_load(void* data, std::size_t size, Memory::Vmm::VAddressSpace& space) {
+    std::expected<LoadedElf, ElfLoadError> elf_load(void* data, std::size_t size, ProcessBlock* space) {
         if (size < sizeof(Elf64_Header)) {
             return std::unexpected(ElfLoadError::Invalid);
         }
@@ -110,7 +113,7 @@ namespace Exe::Elf {
             auto pa = Memory::Pmm::alloc(pages);    
 
             // TODO: Add a proper mmap() syscall
-            Memory::Vmm::map(*space.pml4, pa, aligned_base, aligned_size, flags);
+            Memory::Vmm::map(*space->vaddr.pml4, pa, aligned_base, aligned_size, flags);
             auto* dst = reinterpret_cast<std::uint8_t*>(pa + Limine::get_hhdm());
             
             if (phdr->p_memsz > phdr->p_filesz) {

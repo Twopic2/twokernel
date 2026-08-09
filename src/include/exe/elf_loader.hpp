@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include "arch/x86-64/proc/process.hpp"
 #include "elf.hpp"
 #include "memory/vmm.hpp"
 
@@ -38,5 +39,5 @@ namespace Exe::Elf {
     bool elf_check_file(const Elf64_Header& elf_hdr);
     bool elf_check_supported(const Elf64_Header& elf_hdr);
     
-    std::expected<LoadedElf, ElfLoadError> elf_load(const void* data, std::size_t size, Memory::Vmm::VAddressSpace& space);
+    std::expected<LoadedElf, ElfLoadError> elf_load(const void* data, std::size_t size, x86::Proc::Process::ProcessBlock* process);
 }
