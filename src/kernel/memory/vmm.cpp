@@ -15,8 +15,6 @@ extern "C" void* _data_end[];
 
 namespace Memory::Vmm {
     void init() {
-        Util::klog("Init VMM\n");
-
         kernel_space = new_pagemap();
         fill_kernel_entries(kernel_space);
       
@@ -57,8 +55,6 @@ namespace Memory::Vmm {
 
         load_cr3(kernel_space.pml4_pa);
         // Util::klog("VMM loaded CR3=0x%llx\n", kernel_space.pml4_pa);
-
-        Util::klog("Finished setting up VMM\n");
 
         for (std::size_t i = 0; i < memmap->entry_count; i++) {
             auto* entry = memmap->entries[i];
