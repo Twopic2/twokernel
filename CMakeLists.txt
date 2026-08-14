@@ -130,7 +130,6 @@ add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCE
     src/include/std/atomic
     src/kernel/exe/elf_loader.cpp
     src/kernel/arch/x86-64/arch/cpu.cpp
-    src/kernel/arch/x86-64/arch/syscall.cpp
     src/kernel/arch/x86-64/arch/syscall.s
     src/include/arch/x86-64/arch/syscall.hpp)
 
