@@ -29,8 +29,6 @@ namespace x86::Proc::Process {
         Dead
     };
 
-    using FuncPtr = void(*)(void*);
-    
     inline std::uint16_t total_pid = 0;
     struct ProcessBlock {
         kstd::SingleDeque<Thread::ThreadBlock, &Thread::ThreadBlock::proc_hook> threads;
@@ -40,6 +38,7 @@ namespace x86::Proc::Process {
         
         ProcStats status; 
         bool is_user;
+        bool is_dead;
         std::string_view m_name;
         std::uint16_t pid;
         std::uint8_t thread_size {};
@@ -51,6 +50,6 @@ namespace x86::Proc::Process {
         void add_thread(Thread::ThreadBlock* thread);
         void remove_thread(Thread::ThreadBlock* thread);
 
-        void exit();
+        void exit(int stats = 0);
     };
 }

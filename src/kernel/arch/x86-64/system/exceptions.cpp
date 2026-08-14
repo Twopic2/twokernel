@@ -1,5 +1,6 @@
 #include "arch/x86-64/system/exceptions.hpp"
 #include "arch/x86-64/proc/scheduler.hpp"
+#include "arch/x86-64/system/idt.hpp"
 #include "util/kernel_logger.hpp"
 #include "util/ansi.hpp"
 #include <cstdint>
@@ -36,7 +37,6 @@ namespace x86::System::Idt {
     void x86_invalid_tss_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("invalid TSS (#TS)", frame); }
     void x86_seg_not_present_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("segment not present (#NP)", frame); }
     void x86_stack_seg_fault_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("stack segment fault (#SS)", frame); }
-    void x86_gp_fault_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("general protection fault (#GP)", frame); }
     void x86_x87_floating_point_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("x87 floating point (#MF)", frame); }
     void x86_alignment_check_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("alignment check (#AC)", frame); }
     void x86_machine_check_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("machine check (#MC)", frame); }
@@ -46,6 +46,18 @@ namespace x86::System::Idt {
     void x86_hypervisor_injection_exception_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("hypervisor injection (#HV)", frame); }
     void x86_vmm_comm_exception_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("VMM communication (#VC)", frame); }
     void x86_security_exception_handler(ArchIrq::IrqFrame* frame) { halt_on_exception("security exception (#SX)", frame); }
+
+    void x86_gp_fault_handler(ArchIrq::IrqFrame* frame) {
+        auto thread = Proc::Scheduler::g_scheduler.get_current_thread();
+        if (thread->m_process->is_user && frame->cs == USER_CODE) {
+            Util::klog("killing user process");
+            thread->m_process->exit(-1);
+            Proc::Scheduler::g_scheduler.schedule();
+            return;
+        } 
+
+        asm volatile("cli; hlt");
+    }
 
     void x86_pagefault_handler(ArchIrq::IrqFrame* frame) {
         std::uint64_t pg_address;

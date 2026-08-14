@@ -128,7 +128,9 @@ add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCE
     src/include/drivers/ps2.hpp
     src/include/arch/x86-64/arch/event.hpp
     src/include/std/atomic
-    src/kernel/exe/elf_loader.cpp)
+    src/kernel/exe/elf_loader.cpp
+    src/kernel/arch/x86-64/arch/cpu.cpp
+    src/include/arch/x86-64/arch/syscall.hpp)
 
 if(CMAKE_HOST_APPLE)
     target_compile_definitions(twokernel.elf PRIVATE TWOKERNEL_HOST_MACOS)

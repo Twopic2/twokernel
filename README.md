@@ -48,9 +48,12 @@ https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
 - [x] User page mapping flags (USER bit) in VMM
 - [x] ELF64 loader (program headers → mmap into address space)
 - [x] `iretq`-based ring 3 entry
-- [ ] Syscall entry: SYSCALL/SYSRET, MSR setup (STAR/LSTAR/SFMASK)
+- [x] Syscall entry: SYSCALL/SYSRET, MSR setup (STAR/LSTAR/SFMASK)
 - [ ] Initial syscall set (write, exit, getpid, mmap, brk)
-- [ ] Kernel heap (`kmalloc`/`kfree`, slab or bump-then-free-list on top of PMM)
+    ### 06 - Impl userspace memory
+        - [ ] Kernel heap (`kmalloc`/`kfree`, slab or bump-then-free-list on top of PMM)
+        - [ ] Set up proper vaddr class for user process 
+        - [ ] Set up where user threads points to the user vaddr rather than kernel
 - [ ] `unmap` should also free intermediate page tables when empty + INVLPG / TLB shootdown
 - [ ] Replace PIC with APIC + LAPIC timer (or HPET) — needed for preemptive scheduling
 - [ ] ACPI table parsing (RSDP/MADT) — feeds APIC/SMP

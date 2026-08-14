@@ -131,9 +131,20 @@ namespace x86::Proc::Scheduler {
     }
 
     void Schedule::switch_task(Thread::ThreadBlock* next_thread) {
-        //Util::dump_registers("current thread before context switch", curr_thread->registers);
+        //Util::dump_registers("current thread before context switch", curr_thread->registers); 
+        if (curr_thread->m_process->is_dead && !next_thread->m_process->is_dead) {
+            Memory::Vmm::load_cr3(next_thread->m_process->vaddr.pml4_pa);
+            curr_thread = next_thread;
+            return;
+        } 
+        
         if (curr_thread->state == Thread::ThreadState::Running && curr_thread != idle_thread) { 
             Schedule::add_ready_threads(curr_thread);
+        }
+
+        if (next_thread->m_process->is_dead) {
+            schedule();
+            return;
         }
 
         if (next_thread == idle_thread) {

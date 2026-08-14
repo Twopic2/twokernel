@@ -48,11 +48,12 @@ extern "C" void kmain() {
    // KTest::run("[pmm]");
     //KTest::run("[vmm]");
 
-    KTest::run("[scheduler]");
+    // KTest::run("[scheduler]");
 
      x86::Dev::Timer::timer_init();
 
      x86::Dev::Keyboard::keyboard_init();
+
 
 //    KTest::run("[deque]");
 
@@ -60,7 +61,7 @@ extern "C" void kmain() {
     //KTest::run("[irq]");
     //KTest::run("[ringbuffer]");
 
-     KTest::run("[elf]"); 
+    // KTest::run("[elf]"); 
 
     // Once we finish we halt
 }

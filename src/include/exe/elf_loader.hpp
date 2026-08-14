@@ -26,6 +26,7 @@ namespace Exe::Elf {
     struct LoadedElf {
         std::uint64_t entry;
         std::size_t base;
+        std::size_t end;
         std::size_t phdrs_addr;
         std::uint16_t phdr_count;
         std::uint16_t phdr_size;

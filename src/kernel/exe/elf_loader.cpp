@@ -81,11 +81,29 @@ namespace Exe::Elf {
         }
 
         std::uint64_t image_base {};
-        bool found_base = false;
+        bool base_found = false;
+        std::uint64_t image_end {};
         auto* bytes = reinterpret_cast<std::uint8_t*>(data);
 
         for (std::size_t i = 0; i < ehdr->e_phnum; i++) {
-            auto phdr = reinterpret_cast<Elf64_Phdr*>(ehdr->e_phoff + i * ehdr->e_phentsize);
+            auto phdr = reinterpret_cast<Elf64_Phdr*>(bytes + ehdr->e_phoff + i * ehdr->e_phentsize);
+
+            if (phdr->p_type != ProgramType::Load) {
+                continue;
+            }
+
+            if (!base_found) {
+                image_base = phdr->p_vaddr;
+                base_found = true;
+            }
+
+            if (phdr->p_vaddr + phdr->p_memsz > image_end) {
+                image_end = phdr->p_vaddr + phdr->p_memsz;
+            }
+        }
+
+        for (std::size_t i = 0; i < ehdr->e_phnum; i++) {
+            auto phdr = reinterpret_cast<Elf64_Phdr*>(bytes + ehdr->e_phoff + i * ehdr->e_phentsize);
             
             /* 
                 ! For statically linked ELF's, the most important segment type is the PT_LOAD type. 
@@ -110,25 +128,20 @@ namespace Exe::Elf {
             const std::uint64_t aligned_size = Util::Align::align_up(phdr->p_memsz + page_offset, Memory::Vmm::PAGE_SIZE);
             const std::uint64_t pages = aligned_size / Memory::Vmm::PAGE_SIZE;
 
-            auto pa = Memory::Pmm::alloc(pages);    
+            auto pa = Memory::Pmm::alloc(pages);
 
             // TODO: Add a proper mmap() syscall
             Memory::Vmm::map(*space->vaddr.pml4, pa, aligned_base, aligned_size, flags);
             auto* dst = reinterpret_cast<std::uint8_t*>(pa + Limine::get_hhdm());
-            
-            if (phdr->p_memsz > phdr->p_filesz) {
-                LibC::memset(dst, 0, aligned_size);
-                LibC::memcpy(dst + page_offset, bytes + phdr->p_offset, phdr->p_filesz);
-            }
-            
-            if (!found_base) {
-                image_base = aligned_base;
-            }
+
+            LibC::memset(dst, 0, aligned_size);
+            LibC::memcpy(dst + page_offset, bytes + phdr->p_offset, phdr->p_filesz);
         }
 
         return LoadedElf {
             .entry = ehdr->e_entry,
             .base = image_base,
+            .end = image_end,
             .phdrs_addr = 0,
             .phdr_count = ehdr->e_phnum,
             .phdr_size = ehdr->e_phentsize,

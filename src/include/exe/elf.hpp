@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 /*
@@ -33,7 +34,7 @@
 namespace Exe::Elf {
 	inline constexpr std::uint16_t ELFMACHINE = 0x3e;
     inline constexpr std::size_t EI_NIDENT = 16;
-
+    
 	/* 
 		! EI0-3 
 	*/
@@ -61,12 +62,14 @@ namespace Exe::Elf {
         None = 0,
         Rel = 1,
         Exec = 2,
+        Dynx = 3
     };
 
 	enum class ProgramType : std::uint32_t {
 	 	Null = 0,
         Load = 1,
         Dynamic = 2,
+        Phdr = 6,
 	};
 
     // ? marcos are awful
