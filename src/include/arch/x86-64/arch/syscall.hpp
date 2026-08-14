@@ -8,6 +8,4 @@ namespace Syscalls {
 
     extern "C" std::uint64_t syscall_kernel_rsp;
     extern "C" std::uint64_t syscall_user_rsp;
-
-    void init_syscall();
 }

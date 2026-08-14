@@ -24,7 +24,7 @@ set(CMAKE_SYSTEM_PROCESSOR        x86_64)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 
 project(twokernel LANGUAGES C CXX ASM)
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -130,7 +130,9 @@ add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCE
     src/include/std/atomic
     src/kernel/exe/elf_loader.cpp
     src/kernel/arch/x86-64/arch/cpu.cpp
-    src/include/arch/x86-64/arch/syscall.hpp)
+    src/include/arch/x86-64/arch/syscall.hpp
+    src/kernel/arch/x86-64/arch/syscall.cpp
+    src/kernel/arch/x86-64/arch/syscall.s)
 
 if(CMAKE_HOST_APPLE)
     target_compile_definitions(twokernel.elf PRIVATE TWOKERNEL_HOST_MACOS)
@@ -182,6 +184,7 @@ target_compile_options(twokernel.elf PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-nostdinc
 set_source_files_properties(
     src/kernel/arch/x86-64/system/gdt.s
     src/kernel/arch/x86-64/system/isr.s
+    src/kernel/arch/x86-64/arch/syscall.s
     PROPERTIES COMPILE_OPTIONS "-Wno-unused-command-line-argument"
 )
 
