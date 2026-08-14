@@ -10,7 +10,7 @@
             "binaryDir": "${sourceDir}/build/general-debug-build",
             "cacheVariables": {
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_CXX_STANDARD": "23",
+                "CMAKE_CXX_STANDARD": "26",
                 "CMAKE_CXX_EXTENSIONS": "OFF",
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
@@ -23,7 +23,7 @@
             "binaryDir": "${sourceDir}/build/general-release-build",
             "cacheVariables": {
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_CXX_STANDARD": "23",
+                "CMAKE_CXX_STANDARD": "26",
                 "CMAKE_CXX_EXTENSIONS": "OFF",
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",

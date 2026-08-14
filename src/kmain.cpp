@@ -9,6 +9,7 @@
 #include <util/kernel_logger.hpp>
 #include <drivers/fbtty.hpp>
 #include <drivers/framebuffer.hpp>
+#include <arch/x86-64/arch/cpu.hpp>
 #include <arch/x86-64/arch.hpp>
 #include "util/ansi.hpp"
 
@@ -53,6 +54,8 @@ extern "C" void kmain() {
      x86::Dev::Timer::timer_init();
 
      x86::Dev::Keyboard::keyboard_init();
+
+    Cpu::init_syscall();
 
 
 //    KTest::run("[deque]");
