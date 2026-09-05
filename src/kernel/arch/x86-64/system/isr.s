@@ -14,6 +14,11 @@ irq\i:
 .endif
 .cfi_adjust_cfa_offset 8
 
+testb $3, 16(%rsp)
+jz 1f
+swapgs
+1:
+
 cld
 
 push %rax
@@ -128,6 +133,11 @@ pop %rbx
 pop %rax
 .cfi_adjust_cfa_offset -8
 .cfi_restore %rax
+
+testb $3, 16(%rsp)
+jz 2f
+swapgs
+2:
 
 add $8, %rsp
 .cfi_adjust_cfa_offset -8

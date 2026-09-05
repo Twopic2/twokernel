@@ -1,6 +1,9 @@
 #pragma once 
 
+#include "arch/x86-64/system/gdt.hpp"
 #include "cstdint"
+#include <cstddef>
+#include <type_traits>
 
 /* 
     ! SYSCALL/SYSRET
@@ -65,4 +68,15 @@ namespace Cpu {
     } 
 
     void init_syscall();
+    void init_cpu();
+
+    struct [[gnu::packed]] OneCpu {
+        std::uint64_t syscall_kernel_rsp; 
+        std::uint64_t syscall_user_rsp;  
+    };
+
+    static_assert(offsetof(OneCpu, syscall_kernel_rsp) == 0);
+    static_assert(offsetof(OneCpu, syscall_user_rsp) == 8);
+
+    inline OneCpu bsp_cpu {};
 }

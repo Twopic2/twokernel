@@ -28,7 +28,7 @@ User space thread stacks might be higher at around 1MiB
 namespace x86::Proc::Process { struct ProcessBlock; }
 
 namespace x86::Proc::Thread {
-    inline constexpr std::uint64_t TIME_SLICE_MS = 10;
+    inline constexpr std::uint64_t DEFAULT_SCHEDULE_TIME_MS = 6; 
     inline std::uint64_t total_tid {};
     inline constexpr auto SET_RFLAGS = 0x202;
     inline constexpr auto THREAD_KERNEL_SIZE = 4 * Memory::Vmm::PAGE_SIZE;
@@ -59,7 +59,16 @@ namespace x86::Proc::Thread {
         ThreadState state;
         std::uint16_t thread_id;
         ArchIrq::IrqFrame registers {};
-        std::uint64_t ticks_left;
+
+        std::uint64_t exec_start_ms {}; // ! when the thread goes to the running queue 
+        std::uint64_t total_runtime_ms {};
+        std::uint64_t scheduled_time; // ! So far default is 6ms as suggested by ilobilo
+        std::uint64_t sleep_time {};
+        // std::uint64_t prev_runtime {}; 
+
+        //std::uint64_t userspace_time_ms = 0;
+        //std::uint64_t kernelspace_time_ms = 0;
+
         std::uintptr_t pa;
 
         FuncPtr m_entry {};

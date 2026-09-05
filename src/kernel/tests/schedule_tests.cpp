@@ -26,7 +26,7 @@ namespace Tests {
         // idle_thread is one real, permanently-shared object now (no more
         // per-TU copies once global_idle lost `static`) -- any test that
         // ticks or switches through it mutates its saved registers/
-        // ticks_left/state for real (pit_irq_handler overwrites registers
+        // runtime accounting/state for real (pit_irq_handler overwrites registers
         // wholesale), and none of that was ever undone. It silently leaked
         // into every test that ran afterward. Capture it clean once, before
         // any test has touched it, and restore from that snapshot every time.
@@ -53,6 +53,10 @@ namespace Tests {
         // (which returns early) still restores CR3 and resets the scheduler.
         struct SchedFixture {
             std::uint64_t kernel_cr3 = Memory::Vmm::read_cr3();
+            // The scheduler reads wall time now, so a test that winds the PIT
+            // forward would otherwise leak that clock into every later test.
+            std::uint64_t saved_clocks = Drivers::Pit::pit_clocks;
+            std::uint64_t saved_tick   = Drivers::Pit::tick;
 
             SchedFixture() {
                 reset_sched();
@@ -60,8 +64,26 @@ namespace Tests {
             ~SchedFixture() {
                 reset_sched();
                 Memory::Vmm::load_cr3(kernel_cr3);
+                Drivers::Pit::pit_clocks = saved_clocks;
+                Drivers::Pit::tick       = saved_tick;
             }
         };
+
+        // isr_timer() advances the PIT before handing off to the scheduler.
+        // Driving pit_irq_handler() directly has to do the same or now()
+        // never moves and no slice ever expires.
+        void tick(x86::ArchIrq::IrqFrame* frame) {
+            Drivers::Pit::increase_tick();
+            Drivers::Pit::increase_time();
+            g_scheduler.pit_irq_handler(frame);
+        }
+
+        // Ticks are ~1ms apart, so a 10ms slice needs ~10 of them.
+        void tick_for_ms(x86::ArchIrq::IrqFrame* frame, std::uint64_t ms) {
+            for (std::uint64_t i = 0; i < ms; ++i) {
+                tick(frame);
+            }
+        }
     }
 
     TEST_CASE("a thread acquires its own kernel stack", "[scheduler]") {
@@ -122,9 +144,10 @@ namespace Tests {
         CHECK(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(a.rsp0));
     }
 
-    // On the tick that would reach zero the handler refills the quantum and
-    // reschedules, so ticks_left is never observed at 0.
-    TEST_CASE("PIT ticks drain the quantum and expiry refills it", "[scheduler]") {
+    // Each tick charges the running thread the wall time it actually spent on
+    // the cpu, so total_runtime_ms tracks elapsed milliseconds rather than a
+    // count of ticks.
+    TEST_CASE("PIT ticks charge the running thread real time", "[scheduler]") {
         SchedFixture fixture {};
         Process::ProcessBlock kproc {};
 
@@ -133,25 +156,24 @@ namespace Tests {
         g_scheduler.add_ready_threads(&a);
         g_scheduler.schedule();
         REQUIRE(g_scheduler.curr_thread == &a);
-        REQUIRE(a.ticks_left == Thread::TIME_SLICE_MS);
+        REQUIRE(a.scheduled_time == Thread::DEFAULT_SCHEDULE_TIME_MS);
+        REQUIRE(a.total_runtime_ms == 0);
 
         x86::ArchIrq::IrqFrame frame {};
-        g_scheduler.pit_irq_handler(&frame);
-        CHECK(a.ticks_left == Thread::TIME_SLICE_MS - 1);
+        tick(&frame);
+        CHECK(a.total_runtime_ms > 0);
 
-        for (std::uint64_t i = 0; i < Thread::TIME_SLICE_MS - 2; ++i) {
-            g_scheduler.pit_irq_handler(&frame);
-        }
-        CHECK(a.ticks_left == 1);
-
-        g_scheduler.pit_irq_handler(&frame);
-        CHECK(a.ticks_left == Thread::TIME_SLICE_MS);
+        // A tick is 1ms, so five of them land inside the default slice and
+        // the thread is still the one on the cpu.
+        const auto after_one = a.total_runtime_ms;
+        tick_for_ms(&frame, 4);
+        CHECK(a.total_runtime_ms > after_one);
         CHECK(g_scheduler.curr_thread == &a);
     }
 
-    // The handler reschedules on every tick, so with a second thread ready, a
-    // single tick hands the CPU over to b — long before a's quantum drains.
-    TEST_CASE("every PIT tick rotates the CPU", "[scheduler]") {
+    // Rotation is driven by slice expiry, not by the tick itself: a tick that
+    // lands mid-slice leaves the running thread alone.
+    TEST_CASE("the CPU rotates on slice expiry, not on every tick", "[scheduler]") {
         SchedFixture fixture {};
         Process::ProcessBlock kproc {};
 
@@ -165,11 +187,42 @@ namespace Tests {
 
         x86::ArchIrq::IrqFrame frame {};
 
-        // One tick is enough to rotate now.
-        g_scheduler.pit_irq_handler(&frame);
+        // A single ~1ms tick lands well inside a's slice.
+        tick(&frame);
+        CHECK(g_scheduler.curr_thread == &a);
+
+        // Cross the slice boundary exactly once and the cpu goes to b. Driven
+        // off the constant so retuning DEFAULT_SCHEDULE_TIME_MS doesn't silently make
+        // this tick past a second rotation and land back on a.
+        tick_for_ms(&frame, Thread::DEFAULT_SCHEDULE_TIME_MS);
         CHECK(g_scheduler.curr_thread == &b);
-        // rotation happens with the quantum barely touched, not on expiry
-        CHECK(a.ticks_left == Thread::TIME_SLICE_MS - 1);
+    }
+
+    // A short slice expires sooner than a long one -- the point of moving the
+    // quantum onto the TCB.
+    TEST_CASE("a thread with a shorter slice is preempted sooner", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+        Thread::ThreadBlock b {}; b.m_name = "b"; b.m_process = &kproc;
+
+        a.scheduled_time = 3;   // 3ms
+
+        g_scheduler.add_ready_threads(&a);
+        g_scheduler.add_ready_threads(&b);
+        g_scheduler.schedule();
+        REQUIRE(g_scheduler.curr_thread == &a);
+
+        x86::ArchIrq::IrqFrame frame {};
+
+        // Still inside a's 3ms slice.
+        tick(&frame);
+        CHECK(g_scheduler.curr_thread == &a);
+
+        // Past 3ms but short of the default slice -- a is out, b is in.
+        tick_for_ms(&frame, 4);
+        CHECK(g_scheduler.curr_thread == &b);
     }
 
     // Each tick saves the outgoing thread's live frame into its TCB and loads
@@ -195,14 +248,14 @@ namespace Tests {
         frame.rip = 0xA0;
         frame.rax = 0xAA;
 
-        // One tick: rotation a -> b.
-        g_scheduler.pit_irq_handler(&frame);
+        // Run out a's slice: rotation a -> b.
+        tick_for_ms(&frame, Thread::DEFAULT_SCHEDULE_TIME_MS);
         CHECK(g_scheduler.curr_thread == &b);
         CHECK(a.registers.rip == 0xA0 && a.registers.rax == 0xAA);
         CHECK(frame.rip == 0xB0 && frame.rax == 0xBB);
 
-        // Next tick: rotation b -> a, and a's own frame comes back.
-        g_scheduler.pit_irq_handler(&frame);
+        // Run out b's slice: rotation b -> a, and a's own frame comes back.
+        tick_for_ms(&frame, Thread::DEFAULT_SCHEDULE_TIME_MS);
         CHECK(g_scheduler.curr_thread == &a);
         CHECK(b.registers.rip == 0xB0 && b.registers.rax == 0xBB);
         CHECK(frame.rip == 0xA0 && frame.rax == 0xAA);
@@ -223,8 +276,8 @@ namespace Tests {
 
         x86::ArchIrq::IrqFrame frame {};
 
-        // A single tick rotates to b and moves TSS.rsp0 with it.
-        g_scheduler.pit_irq_handler(&frame);
+        // Slice expiry rotates to b and moves TSS.rsp0 with it.
+        tick_for_ms(&frame, Thread::DEFAULT_SCHEDULE_TIME_MS);
         CHECK(g_scheduler.curr_thread == &b);
         CHECK(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(b.rsp0));
     }
@@ -272,14 +325,34 @@ namespace Tests {
         CHECK(a.state == Thread::ThreadState::Running);
     }
 
-    // The guard compares the requested ticks against the current PIT time,
-    // so we push the clock forward to let the request through.
+    // sleep() stores a countdown in ticks and hands the cpu away immediately.
     TEST_CASE("sleep() parks the caller on the sleeping queue", "[scheduler]") {
         SchedFixture fixture {};
         Process::ProcessBlock kproc {};
 
-        const auto saved_clocks = Drivers::Pit::pit_clocks;
-        Drivers::Pit::pit_clocks = 2 * Drivers::Pit::HZ;   // now() == 2000 ms
+        Drivers::Pit::tick = 2000;                         // now() == 2000ms
+
+        Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+        g_scheduler.curr_thread = &a;
+        a.state = Thread::ThreadState::Running;
+
+        g_scheduler.sleep(50);
+
+        CHECK(a.state == Thread::ThreadState::Sleep);
+        CHECK(a.sleep_time == 50);
+        CHECK_FALSE(g_scheduler.waiting_queue.empty());
+        // Nothing else was ready, so the cpu went to idle rather than staying
+        // with the sleeper.
+        CHECK(g_scheduler.curr_thread == g_scheduler.idle_thread);
+    }
+
+    // The countdown is a duration, so the clock it was queued at never enters
+    // into it -- 50ms is 50 ticks whether uptime reads 2000ms or 0.
+    TEST_CASE("sleep() stores a duration, not a point on the clock", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Drivers::Pit::tick = 0;                            // now() == 0
 
         Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
         g_scheduler.curr_thread = &a;
@@ -287,40 +360,13 @@ namespace Tests {
 
         g_scheduler.sleep(50);
         CHECK(a.state == Thread::ThreadState::Sleep);
-        CHECK(a.ticks_left == 50);
+        CHECK(a.sleep_time == 50);
         CHECK_FALSE(g_scheduler.waiting_queue.empty());
-        // NOTE: sleep() does not call schedule(), so the sleeper is still the
-        // current thread and keeps running until the next PIT tick rotates
-        // it out. Worth revisiting if you want sleep() to yield immediately.
-        CHECK(g_scheduler.curr_thread == &a);
-
-        Drivers::Pit::pit_clocks = saved_clocks;
     }
 
-    // With the clock at 0, `time > now` is true for any positive sleep, so
-    // the guard bails early. This pins the present behaviour of an
-    // inverted-looking guard — flip the assertions if you fix it.
-    TEST_CASE("sleep() request is dropped when ticks > now (current guard)", "[scheduler]") {
-        SchedFixture fixture {};
-        Process::ProcessBlock kproc {};
-
-        const auto saved_clocks = Drivers::Pit::pit_clocks;
-        Drivers::Pit::pit_clocks = 0;                      // now() == 0 ms
-
-        Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
-        g_scheduler.curr_thread = &a;
-        a.state = Thread::ThreadState::Running;
-
-        g_scheduler.sleep(50);                             // 50 > 0 -> early return
-        CHECK(a.state == Thread::ThreadState::Running);
-        CHECK(g_scheduler.waiting_queue.empty());
-
-        Drivers::Pit::pit_clocks = saved_clocks;
-    }
-
-    // A runner keeps the scheduler live; the sleeper's ticks_left counts
-    // down one per tick and the thread is released when it hits zero.
-    TEST_CASE("PIT ticks drain a sleeper's timer and wake it", "[scheduler]") {
+    // A lone sleeper holds the head every tick, so its countdown advances once
+    // per tick and it is released on exactly the nth one.
+    TEST_CASE("PIT ticks wake a sleeper once its countdown runs out", "[scheduler]") {
         SchedFixture fixture {};
         Process::ProcessBlock kproc {};
 
@@ -330,17 +376,150 @@ namespace Tests {
         g_scheduler.add_ready_threads(&runner);            // curr = runner
 
         sleeper.state      = Thread::ThreadState::Sleep;
-        sleeper.ticks_left = 3;
+        sleeper.sleep_time = 3;
         g_scheduler.waiting_queue.push_tail(&sleeper);
 
         x86::ArchIrq::IrqFrame frame {};
-        g_scheduler.pit_irq_handler(&frame);
-        CHECK(sleeper.ticks_left == 2);
+        tick_for_ms(&frame, 2);                            // one tick short
+        CHECK(sleeper.state == Thread::ThreadState::Sleep);
+        CHECK(sleeper.sleep_time == 1);
 
-        g_scheduler.pit_irq_handler(&frame);               // 2 -> 1
-        g_scheduler.pit_irq_handler(&frame);               // 1 -> 0, wakes
+        tick(&frame);                                      // the third tick
         CHECK(sleeper.state != Thread::ThreadState::Sleep);
-        CHECK_FALSE(g_scheduler.ready_threads.empty());
+        CHECK(g_scheduler.waiting_queue.empty());
+    }
+
+    // Only the thread at the head counts down, so sleepers are released
+    // strictly in the order they were queued -- one per tick here, since each
+    // wake-up promotes the next one to the head.
+    TEST_CASE("sleepers wake in the order they were queued", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Thread::ThreadBlock runner {}; runner.m_name = "runner"; runner.m_process = &kproc;
+        Thread::ThreadBlock s0 {}; s0.m_name = "s0"; s0.m_process = &kproc;
+        Thread::ThreadBlock s1 {}; s1.m_name = "s1"; s1.m_process = &kproc;
+        Thread::ThreadBlock s2 {}; s2.m_name = "s2"; s2.m_process = &kproc;
+
+        g_scheduler.add_ready_threads(&runner);
+
+        for (auto* s : {&s0, &s1, &s2}) {
+            s->state      = Thread::ThreadState::Sleep;
+            s->sleep_time = 1;
+            g_scheduler.waiting_queue.push_tail(s);
+        }
+
+        x86::ArchIrq::IrqFrame frame {};
+
+        tick(&frame);
+        CHECK(s0.state != Thread::ThreadState::Sleep);
+        CHECK(s1.state == Thread::ThreadState::Sleep);
+        CHECK(s2.state == Thread::ThreadState::Sleep);
+
+        tick(&frame);
+        CHECK(s1.state != Thread::ThreadState::Sleep);
+        CHECK(s2.state == Thread::ThreadState::Sleep);
+
+        tick(&frame);
+        CHECK(s2.state != Thread::ThreadState::Sleep);
+        CHECK(g_scheduler.waiting_queue.empty());
+    }
+
+    // A sleeper behind another does not start counting until the one ahead of
+    // it wakes, so its delay is the sum of everything queued in front. A 2ms
+    // sleep queued behind a 5ms one lands at 7ms, not 2ms -- head-only is a
+    // wake *order*, not a set of independent timers.
+    TEST_CASE("a sleeper queued behind another waits for it too", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Thread::ThreadBlock runner {}; runner.m_name = "runner"; runner.m_process = &kproc;
+        Thread::ThreadBlock slow {}; slow.m_name = "slow"; slow.m_process = &kproc;
+        Thread::ThreadBlock fast {}; fast.m_name = "fast"; fast.m_process = &kproc;
+
+        g_scheduler.add_ready_threads(&runner);
+
+        slow.state = Thread::ThreadState::Sleep; slow.sleep_time = 5;
+        fast.state = Thread::ThreadState::Sleep; fast.sleep_time = 2;
+        g_scheduler.waiting_queue.push_tail(&slow);        // head
+        g_scheduler.waiting_queue.push_tail(&fast);        // behind it
+
+        x86::ArchIrq::IrqFrame frame {};
+
+        tick_for_ms(&frame, 4);
+        CHECK(slow.state == Thread::ThreadState::Sleep);
+        CHECK(slow.sleep_time == 1);
+        // fast held the tail the whole time, so nothing was taken off it.
+        CHECK(fast.sleep_time == 2);
+
+        tick(&frame);                                      // slow's 5th tick
+        CHECK(slow.state != Thread::ThreadState::Sleep);
+        CHECK(fast.state == Thread::ThreadState::Sleep);
+
+        // Only now does fast reach the head and begin counting.
+        tick_for_ms(&frame, 2);
+        CHECK(fast.state != Thread::ThreadState::Sleep);
+        CHECK(g_scheduler.waiting_queue.empty());
+    }
+
+    // A tick spent on the countdown ends there -- it never reaches the
+    // round-robin path, so neither the runtime charge nor the slice check
+    // happens while a sleeper holds the head.
+    TEST_CASE("a countdown tick does not rotate the cpu", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
+        Thread::ThreadBlock b {}; b.m_name = "b"; b.m_process = &kproc;
+        Thread::ThreadBlock sleeper {}; sleeper.m_name = "sleeper"; sleeper.m_process = &kproc;
+
+        g_scheduler.add_ready_threads(&a);
+        g_scheduler.add_ready_threads(&b);
+        g_scheduler.schedule();                            // curr = a, ready = [b]
+        REQUIRE(g_scheduler.curr_thread == &a);
+
+        sleeper.state      = Thread::ThreadState::Sleep;
+        sleeper.sleep_time = 2 * Thread::DEFAULT_SCHEDULE_TIME_MS;
+        g_scheduler.waiting_queue.push_tail(&sleeper);
+
+        x86::ArchIrq::IrqFrame frame {};
+        tick_for_ms(&frame, Thread::DEFAULT_SCHEDULE_TIME_MS + 2);
+
+        // Well past a's slice, but every one of those ticks went to the
+        // countdown instead.
+        CHECK(g_scheduler.curr_thread == &a);
+        CHECK(a.total_runtime_ms == 0);
+        CHECK(sleeper.sleep_time == Thread::DEFAULT_SCHEDULE_TIME_MS - 2);
+
+        // Once the queue drains, the very next tick reaches the slice check --
+        // a's delta has been accumulating the whole time -- and b takes over.
+        tick_for_ms(&frame, Thread::DEFAULT_SCHEDULE_TIME_MS - 2);
+        REQUIRE(g_scheduler.waiting_queue.empty());
+        tick(&frame);
+        CHECK(g_scheduler.curr_thread == &b);
+    }
+
+    // Blocked threads share the waiting queue but carry no countdown --
+    // sleep_time is 0 for them, which the drain would read as "expired". The
+    // head check goes by state, so a blocked thread at the head is left where
+    // it is and the tick falls through to the round-robin path instead.
+    TEST_CASE("the sleep drain leaves blocked threads queued", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Thread::ThreadBlock runner  {}; runner.m_name  = "runner";  runner.m_process  = &kproc;
+        Thread::ThreadBlock blocked {}; blocked.m_name = "blocked"; blocked.m_process = &kproc;
+
+        g_scheduler.add_ready_threads(&runner);
+
+        blocked.state = Thread::ThreadState::Blocked;
+        g_scheduler.waiting_queue.push_tail(&blocked);
+
+        x86::ArchIrq::IrqFrame frame {};
+        tick_for_ms(&frame, 20);
+
+        CHECK(blocked.state == Thread::ThreadState::Blocked);
+        CHECK_FALSE(g_scheduler.waiting_queue.empty());
     }
 
     // process A owns thread A, process B owns thread B. Each ProcessBlock{}
@@ -404,8 +583,9 @@ namespace Tests {
         bool saw_process_b = false;
         bool cr3_tracks_process = true;
 
-        for (int i = 0; i < 8; ++i) {
-            g_scheduler.pit_irq_handler(&frame);
+        // Long enough to cross several 10ms slices, not just a few ticks.
+        for (int i = 0; i < 40; ++i) {
+            tick(&frame);
 
             if (g_scheduler.curr_thread == &tb) {
                 saw_process_b = true;
@@ -419,8 +599,8 @@ namespace Tests {
 
         CHECK(saw_process_b);
         CHECK(cr3_tracks_process);
-        // process A's quantum is being spent across the ticks
-        CHECK(ta.ticks_left < Thread::TIME_SLICE_MS);
+        // process A was charged for the time it spent on the cpu
+        CHECK(ta.total_runtime_ms > 0);
     }
 
     // A single thread that blocks with nothing else ready must hand the CPU
@@ -503,7 +683,7 @@ namespace Tests {
 
         CHECK(g_scheduler.curr_thread == &a);
         CHECK(a.state == Thread::ThreadState::Ready);
-}
+    }
 
     // A PIT tick that fires while idle is already resident and nothing new
     // is ready should leave the CPU parked on idle, not wander off or crash
@@ -522,7 +702,7 @@ namespace Tests {
         REQUIRE(g_scheduler.curr_thread == g_scheduler.idle_thread);
 
         x86::ArchIrq::IrqFrame frame {};
-        g_scheduler.pit_irq_handler(&frame);
+        tick_for_ms(&frame, 12);
 
         CHECK(g_scheduler.curr_thread == g_scheduler.idle_thread);
     }

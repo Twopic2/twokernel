@@ -13,7 +13,7 @@ namespace x86::Proc::Thread {
     : m_name(name), m_entry(entry), m_process(process) {
         init_kernel_stack();
 
-        ticks_left = TIME_SLICE_MS;
+        scheduled_time = DEFAULT_SCHEDULE_TIME_MS;
         state = ThreadState::Ready;
         
         if (process->is_user) {
@@ -35,7 +35,7 @@ namespace x86::Proc::Thread {
     ThreadBlock::ThreadBlock() {
         init_kernel_stack();
 
-        ticks_left = TIME_SLICE_MS;
+        scheduled_time = DEFAULT_SCHEDULE_TIME_MS;
         state = ThreadState::Ready;
         registers.cs = System::Idt::KERNEL_CODE;
         registers.ss = System::Idt::KERNEL_DATA;
@@ -68,6 +68,6 @@ namespace x86::Proc::Thread {
     }
 
     void ThreadBlock::reset() {
-        ticks_left = TIME_SLICE_MS;
+        scheduled_time = DEFAULT_SCHEDULE_TIME_MS;
     }
 }

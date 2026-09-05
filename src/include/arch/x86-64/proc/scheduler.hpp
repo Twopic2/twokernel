@@ -46,12 +46,6 @@
  */
 
 namespace x86::Proc::Scheduler {
-    inline void set_idle(void*) {
-        while (true) {
-            asm volatile("hlt");
-        }
-    }
-
     struct Schedule {
         std::uint8_t disable_counter {}; 
         std::uint8_t task_switch_counter {};   
@@ -71,17 +65,29 @@ namespace x86::Proc::Scheduler {
         void switch_task(Thread::ThreadBlock* next_thread);
 
         void yield();
-        void sleep(std::uint64_t ns);
+        void sleep(std::uint64_t milli);
 
         void pit_irq_handler(ArchIrq::IrqFrame* frame);
         void schedule();
-        void reschedule();
+        void reschedule(); 
+
+        inline Process::ProcessBlock* get_current_process() {
+            auto thread = get_current_thread();
+            return thread->m_process;
+        }
         
         Schedule(Thread::ThreadBlock* idle) {
             idle->state = Thread::ThreadState::Running;
             idle_thread = idle;
         }
     };
+
+    // TODO port this to the cpu struct 
+    inline void set_idle(void*) {
+        while (true) {
+            asm volatile("hlt");
+        }
+    }
 
     inline Process::ProcessBlock global_process {"kernel", false};
     inline Thread::ThreadBlock global_idle  {"idle", &global_process, set_idle, nullptr};

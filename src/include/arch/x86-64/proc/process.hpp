@@ -48,8 +48,12 @@ namespace x86::Proc::Process {
         ProcessBlock();
 
         void add_thread(Thread::ThreadBlock* thread);
-        void remove_thread(Thread::ThreadBlock* thread);
+        void remove_thread(Thread::ThreadBlock* thread);        
 
         void exit(int stats = 0);
+        
+        inline void remove_all_threads() {
+            threads.clear_all();    
+        }
     };
 }

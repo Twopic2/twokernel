@@ -91,6 +91,8 @@ namespace x86::System::Irq {
         //Util::klog("init arch_interrupt_handler"); 
         // CPU exception
         if (vector < 32) {
+            
+
             if (auto h = irq_handlers[vector]) {
                 h(frame);
             } else {

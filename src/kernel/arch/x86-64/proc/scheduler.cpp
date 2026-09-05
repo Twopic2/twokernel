@@ -59,9 +59,11 @@ namespace x86::Proc::Scheduler {
         if (ready_threads.empty()) {
             ready_threads.push_head(thread);
             System::Gdt::tss.rsp0 = reinterpret_cast<std::uint64_t>(thread->rsp0);
+            Cpu::bsp_cpu.syscall_kernel_rsp = System::Gdt::tss.rsp0; // ! syscall.S reads this, not the TSS
             Memory::Vmm::load_cr3(thread->m_process->vaddr.pml4_pa);
             
             curr_thread = thread;
+            curr_thread->exec_start_ms = Drivers::Pit::get_time_milliseconds();
 
             return;
         }
@@ -76,35 +78,43 @@ namespace x86::Proc::Scheduler {
         }
 
         lock_scheduler();
-
         curr_thread->registers = *frame;
 
+        // TODO This is a massive problem MUSTFIX
         if (!waiting_queue.empty()) {
             auto* sleep_thread = waiting_queue.pop_head();
 
-            if (sleep_thread->ticks_left != 0) {
-                sleep_thread->ticks_left--;
+            if (sleep_thread->state == Thread::ThreadState::Blocked) {
+                waiting_queue.push_head(sleep_thread);
+                
+                unlock_scheduler();
+                *frame = curr_thread->registers;
+
+                return;
             }
 
-            if (sleep_thread->ticks_left == 0) {
+            if (sleep_thread->sleep_time > 0) {
+                --sleep_thread->sleep_time;
+            } 
+
+            if (sleep_thread->sleep_time != 0) {
+                waiting_queue.push_head(sleep_thread);
+            } else {
                 unblock(sleep_thread);
-            }
+            } 
 
-            waiting_queue.push_tail(sleep_thread);
+            unlock_scheduler();
+            *frame = curr_thread->registers;
+
+            return;
         }
+        
+        auto now = Drivers::Pit::get_time_milliseconds();
+        auto delta = now - curr_thread->exec_start_ms;
+      
+        curr_thread->total_runtime_ms += 1;
 
-        /* 
-            ! Basics of Round Robin 
-
-            ? Round robin is great for average response time but horrible for turnaround
-         */
-
-        if (curr_thread->ticks_left != 0) {
-            curr_thread->ticks_left -= 1; // Quantum Time ticker
-            if (curr_thread->ticks_left == 0) {
-                curr_thread->ticks_left = Thread::TIME_SLICE_MS;
-                Schedule::schedule();
-            }
+        if (delta >= curr_thread->scheduled_time) {
             Schedule::schedule();
         }
 
@@ -135,6 +145,7 @@ namespace x86::Proc::Scheduler {
         if (curr_thread->m_process->is_dead && !next_thread->m_process->is_dead) {
             Memory::Vmm::load_cr3(next_thread->m_process->vaddr.pml4_pa);
             curr_thread = next_thread;
+            curr_thread->exec_start_ms = Drivers::Pit::get_time_milliseconds();
             return;
         } 
         
@@ -149,30 +160,30 @@ namespace x86::Proc::Scheduler {
 
         if (next_thread == idle_thread) {
             curr_thread = next_thread;
+            curr_thread->exec_start_ms = Drivers::Pit::get_time_milliseconds();
             return;
         }
 
         System::Gdt::tss.rsp0 = reinterpret_cast<std::uint64_t>(next_thread->rsp0);
+        Cpu::bsp_cpu.syscall_kernel_rsp = System::Gdt::tss.rsp0; // ! syscall.S reads this, not the TSS
 
         if (next_thread->m_process != curr_thread->m_process) {
             Memory::Vmm::load_cr3(next_thread->m_process->vaddr.pml4_pa);
         }
 
         curr_thread = next_thread;
+        curr_thread->exec_start_ms = Drivers::Pit::get_time_milliseconds();
       //  Util::dump_registers("next thread after context switch", next_thread.registers);
     }
 
-    void Schedule::sleep(std::uint64_t time) {
+    void Schedule::sleep(std::uint64_t milli) {
         lock_scheduler();
 
-        if (time > Drivers::Pit::get_time_milliseconds()) {
-            unlock_scheduler();
-            return;
-        }
-
-        curr_thread->ticks_left = time;
+        curr_thread->sleep_time = milli;
         curr_thread->state = Thread::ThreadState::Sleep;
         waiting_queue.push_tail(curr_thread);
+
+        schedule();
 
         unlock_scheduler();
     }

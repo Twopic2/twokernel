@@ -1,3 +1,4 @@
+#include "arch/x86-64/arch/syscall.hpp"
 #include "arch/x86-64/dev/timer.hpp"
 #include "arch/x86-64/dev/keyboard.hpp"
 #include "arch/x86-64/proc/scheduler.hpp"
@@ -49,12 +50,15 @@ extern "C" void kmain() {
    // KTest::run("[pmm]");
     //KTest::run("[vmm]");
 
-    // KTest::run("[scheduler]");
+    KTest::run("[scheduler]");
 
-     x86::Dev::Timer::timer_init();
+    x86::Dev::Timer::timer_init();
 
-     x86::Dev::Keyboard::keyboard_init();
+    x86::Dev::Keyboard::keyboard_init();
 
+    Syscalls::init_syscalls();
+    
+    Cpu::init_cpu();
     Cpu::init_syscall();
 
 

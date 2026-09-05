@@ -3,31 +3,30 @@
 .type syscall_hanlder, @function
 
 syscall_hanlder:
-    movq %rsp, syscall_user_rsp(%rip)
-    movq syscall_kernel_rsp(%rip), %rsp
+    /* Switches to kernel_rsp from user_rsp*/
+    swapgs
+    movq %rsp, %gs:8    
+    movq %gs:0, %rsp
 
-    pushq $0x23                     /* ss     -- USER_DATA | 3 */
-    pushq syscall_user_rsp(%rip)    /* rsp                     */
-    pushq %r11                      /* rflags                  */
-    pushq $0x1b                     /* cs     -- USER_CODE | 3 */
-    pushq %rcx                      /* rip                     */
-    pushq $0                        /* error  -- isr.s pushes a dummy too */
+    pushq %gs:8
+    pushq %r11                      
+    pushq %rcx                      
 
-    push %rax
-    push %rbx
-    push %rcx
-    push %rdx
-    push %rdi
-    push %rsi
-    push %rbp
-    push %r8
-    push %r9
-    push %r10
-    push %r11
-    push %r12
-    push %r13
-    push %r14
     push %r15
+    push %r14
+    push %r13
+    push %r12
+    push %r11
+    push %r10
+    push %r9
+    push %r8
+    push %rbp
+    push %rsi
+    push %rdi
+    push %rdx
+    push %rcx
+    push %rbx
+    push %rax
 
     cld
 
@@ -37,32 +36,31 @@ syscall_hanlder:
     mov %rsp, %rbp
     and $~15, %rsp
 
-    call syscall_dispatch
+    call do_syscall_64 
 
     mov %rbp, %rsp
     pop %rbp
 
-    pop %r15
-    pop %r14
-    pop %r13
-    pop %r12
-    pop %r11
-    pop %r10
-    pop %r9
-    pop %r8
-    pop %rbp
-    pop %rsi
-    pop %rdi
-    pop %rdx
-    pop %rcx
-    pop %rbx
     pop %rax
+    pop %rbx
+    pop %rcx
+    pop %rdx
+    pop %rdi
+    pop %rsi
+    pop %rbp
+    pop %r8
+    pop %r9
+    pop %r10
+    pop %r11
+    pop %r12
+    pop %r13
+    pop %r14
+    pop %r15
 
-    add $8, %rsp                    /* error  */
-    popq %rcx                       /* rip    */
-    add $8, %rsp                    /* cs     */
-    popq %r11                       /* rflags */
-    popq %rsp                       /* back onto the user stack */
+    popq %rcx
+    popq %r11
+    swapgs
+    popq %rsp
 
     sysretq
 

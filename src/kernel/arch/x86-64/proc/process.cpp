@@ -39,9 +39,11 @@ namespace x86::Proc::Process {
         if (stats == -1) {
             status = ProcStats::Dead;
             is_dead = true;
+            remove_all_threads();
             return;
         } 
 
         status = ProcStats::Zombie;
+        remove_all_threads();
     }
 }

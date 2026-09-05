@@ -132,7 +132,8 @@ add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCE
     src/kernel/arch/x86-64/arch/cpu.cpp
     src/include/arch/x86-64/arch/syscall.hpp
     src/kernel/arch/x86-64/arch/syscall.cpp
-    src/kernel/arch/x86-64/arch/syscall.s)
+    src/kernel/arch/x86-64/arch/syscall.s
+    src/include/arch/x86-64/arch/arch_syscalls.hpp)
 
 if(CMAKE_HOST_APPLE)
     target_compile_definitions(twokernel.elf PRIVATE TWOKERNEL_HOST_MACOS)

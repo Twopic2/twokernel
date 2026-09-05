@@ -48,7 +48,7 @@ namespace Drivers::Pit {
 
     void increase_time() {
         seconds       = pit_clocks / HZ;
-        milli_seconds = (pit_clocks * 1000) / HZ;
+        milli_seconds = get_time_milliseconds();
     }
 
     std::uint64_t get_time_seconds() {
@@ -56,6 +56,6 @@ namespace Drivers::Pit {
     }
 
     std::uint64_t get_time_milliseconds() {
-        return (pit_clocks * 1000) / HZ;
+        return (tick * 1000) / FREQUENCY;
     }
 }
