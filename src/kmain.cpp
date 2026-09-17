@@ -70,9 +70,9 @@ extern "C" void kmain() {
 
     // KTest::run("[elf]"); 
 
-    // Creating user process 
+  /*   
     auto init_proc = x86::Proc::Process::ProcessBlock("init", true);
-    auto* user_thread = x86::Proc::Thread::ThreadBlock {"init_thread", &init_proc, };
+    auto* user_thread = x86::Proc::Thread::ThreadBlock {"init_thread", &init_proc, }; */
 
 
     // Once we finish we halt
