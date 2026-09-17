@@ -2,11 +2,9 @@
 #include <cstdint>
 */
 
-/* 
+/*
     ! Notes
-    TODO: look into slab allocators 
-
-    So the name of the files is a bit confusing due to there being vmem/vmm, ignore that for a sec.
+    ? So the name of the files is a bit confusing due to there being vmem/vmm, ignore that for a sec.
 
     ? Once we have some kind of address translation enabled, all memory we can access is now virtual memory. 
     ? This address translation is usually performed by the MMU (memory management unit) which we can program in someway.
@@ -23,17 +21,14 @@
 
 /* 
 namespace Memory::Vmem {
+    inline constexpr auto USER_SPACE_END = 0x7FFFFFFFF000;
+
     struct VmObject {
-        std::uint64_t base;
+        PageMap* base;
         std::uint64_t length;
         std::uint64_t flags;
-        struct VmObjec* next;
+        VmObject* next;
     };
-
-    inline VmObject* head_list {};
-
-    void* vmem_alloc(std::uint64_t length, std::uint64_t flags);
-    void vmem_free(void* addr);
 
     void init_alloc();
 }

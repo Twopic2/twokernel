@@ -22,11 +22,11 @@ namespace x86::System::Gdt {
         kernel_data |= 1 << 21; //long-mode segment        
         gdt_entries[2] = kernel_data << 32;
 
-        std::uint64_t user_code = kernel_code | static_cast<std::uint64_t>(3 << 13); // Ring 3
-        gdt_entries[3] = user_code << 32;
-
         std::uint64_t user_data = kernel_data | static_cast<std::uint64_t>(3 << 13); // Ring 3
-        gdt_entries[4] = user_data << 32;
+        gdt_entries[3] = user_data << 32;
+
+        std::uint64_t user_code = kernel_code | static_cast<std::uint64_t>(3 << 13); // Ring 3
+        gdt_entries[4] = user_code << 32;
 
         const auto base  = reinterpret_cast<std::uintptr_t>(&tss);
         const std::uint16_t limit = static_cast<std::uint16_t>(sizeof(tss) - 1);

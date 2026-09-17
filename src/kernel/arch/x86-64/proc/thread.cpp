@@ -18,7 +18,7 @@ namespace x86::Proc::Thread {
         
         if (process->is_user) {
             registers.cs = System::Idt::USER_CODE | 3;
-            registers.ss = System::Idt::USER_DATA | 3;   
+            registers.ss = System::Idt::USER_DATA | 3;
         } else {
             registers.cs = System::Idt::KERNEL_CODE;
             registers.ss = System::Idt::KERNEL_DATA;
@@ -48,11 +48,11 @@ namespace x86::Proc::Thread {
     void ThreadBlock::init_kernel_stack() {
        Util::IrqGaurd irq_gaurd {};
         
-        pa = Memory::Pmm::alloc(4);
-        if (pa == 0) {
+        kernel_pa = Memory::Pmm::alloc(4);
+        if (kernel_pa == 0) {
             Util::klog_panic("Pmm::alloc(4) failed in init_kernel_stack() -- out of physical memory\n");
         }
-        auto* k_stack = reinterpret_cast<std::uint64_t*>(pa + Limine::get_hhdm());
+        auto* k_stack = reinterpret_cast<std::uint64_t*>(kernel_pa + Limine::get_hhdm());
         kernel_stack = k_stack;
 
         auto* top = reinterpret_cast<std::byte*>(k_stack) + THREAD_KERNEL_SIZE;
@@ -61,10 +61,14 @@ namespace x86::Proc::Thread {
         registers.rsp = reinterpret_cast<std::uint64_t>(rsp0);
     }
 
+    void ThreadBlock::init_user_stack() {
+        
+    }
+
     void ThreadBlock::exit() {
         Util::IrqGaurd irq {};
         state = ThreadState::Zombie;
-        Memory::Pmm::free(pa, 4);
+        Memory::Pmm::free(kernel_pa, 4);
     }
 
     void ThreadBlock::reset() {

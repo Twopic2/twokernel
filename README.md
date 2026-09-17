@@ -49,9 +49,9 @@ https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
 - [x] ELF64 loader (program headers → mmap into address space)
 - [x] `iretq`-based ring 3 entry
 - [x] Syscall entry: SYSCALL/SYSRET, MSR setup (STAR/LSTAR/SFMASK)
-- [ ] Initial syscall set (write, exit, getpid, mmap, brk)
+- [?] Initial syscall set (write, exit, getpid, mmap, brk)
     ### 06 - Impl userspace memory
-        - [ ] Kernel heap (`kmalloc`/`kfree`, slab or bump-then-free-list on top of PMM)
+        - [x] Kernel heap (`kmalloc`/`kfree`, slab or bump-then-free-list on top of PMM)
         - [ ] Set up proper vaddr class for user process 
         - [ ] Set up where user threads points to the user vaddr rather than kernel
 - [ ] `unmap` should also free intermediate page tables when empty + INVLPG / TLB shootdown

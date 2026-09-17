@@ -1,5 +1,5 @@
 #include "arch/x86-64/arch/cpu.hpp"
-#include "arch/x86-64/arch/syscall.hpp"
+#include "sys/syscalls.hpp"
 #include "util/kernel_logger.hpp"
 #include "util/ansi.hpp"
 #include "arch/x86-64/system/gdt.hpp"
@@ -18,7 +18,8 @@ using namespace Syscalls;
 namespace Cpu {
     // ? Credit to @RaidTheWeb
     void init_syscall() {
-        write_msr(MSRKGSBASE, reinterpret_cast<std::uint64_t>(&bsp_cpu));
+        write_msr(MSRGSBASE, reinterpret_cast<std::uint64_t>(&bsp_cpu));
+        write_msr(MSRKGSBASE, 0);
 
         std::uint64_t efer = read_msr(MSREFER);
         efer |= 1;
@@ -26,6 +27,7 @@ namespace Cpu {
 
         std::uint64_t star {};
         star |= static_cast<std::uint64_t>(0x08) << 32;
+        star |= static_cast<std::uint64_t>(0x10) << 48;
         write_msr(MSRSTAR, star);
 
         Util::klog("syscall: STAR=0x%llx (syscall cs 0x%llx)\n",
@@ -50,6 +52,7 @@ namespace Cpu {
     }
 
     void init_cpu() {
+        Syscalls::init_syscalls();
         bsp_cpu.syscall_kernel_rsp = x86::System::Gdt::tss.rsp0;
     }
 }

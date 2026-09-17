@@ -41,16 +41,21 @@ namespace x86::Syscalls {
         }
 
         constexpr std::uint64_t arg0() {
-            return rsi;
+            return rdi;
         }
 
         constexpr std::uint64_t arg1() {
-            return rdi;
+            return rsi;
         }
 
         constexpr std::uint64_t arg2() {
             return rdx;
         }
+
+        /* 
+        ! Note 
+        The syscall instruction itself destroys RCX and R11.
+        */
 
         constexpr std::uint64_t arg3() {
             return r10;
@@ -63,5 +68,5 @@ namespace x86::Syscalls {
         constexpr std::uint64_t arg5() {
             return r9;
         }
-    };
+    };    
 }

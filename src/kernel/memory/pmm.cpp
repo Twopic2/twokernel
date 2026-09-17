@@ -71,7 +71,7 @@ namespace Memory::Pmm {
     }
 
     void reclaim_bootloader(std::uint64_t memap_type, std::uintptr_t phys_mem, std::uintptr_t page_amount) {
-        if (memap_type == Limine::Memmap::bootloader && page_amount != 0) {
+        if (memap_type == Limine::Memmap::bootloader && memap_type && page_amount != 0) {
             push_list(phys_mem, page_amount);
         }
         

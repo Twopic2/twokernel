@@ -40,5 +40,5 @@ namespace Exe::Elf {
     bool elf_check_file(const Elf64_Header& elf_hdr);
     bool elf_check_supported(const Elf64_Header& elf_hdr);
     
-    std::expected<LoadedElf, ElfLoadError> elf_load(const void* data, std::size_t size, x86::Proc::Process::ProcessBlock* process);
+    std::expected<LoadedElf, ElfLoadError> elf_load(void* data, std::size_t size, x86::Proc::Process::ProcessBlock* process);
 }

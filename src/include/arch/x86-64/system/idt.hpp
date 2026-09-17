@@ -32,8 +32,8 @@ namespace x86::System::Idt {
 
     constexpr std::uint8_t KERNEL_CODE = 0x08;
     constexpr std::uint8_t KERNEL_DATA = 0x10;
-    constexpr std::uint8_t USER_CODE = 0x18;
-    constexpr std::uint8_t USER_DATA = 0x20;
+    constexpr std::uint8_t USER_DATA = 0x18;
+    constexpr std::uint8_t USER_CODE = 0x20;
 
     constexpr std::size_t IDT_VECTOR {256};
 

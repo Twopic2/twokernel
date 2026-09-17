@@ -2,8 +2,8 @@
 
 #include "arch/x86-64/arch/arch_syscalls.hpp"
 #include "arch/x86-64/proc/scheduler.hpp"
-#include "arch/x86-64/arch/sys_list.hpp"
-#include "arch_irq.hpp"
+#include "sys/sys_list.hpp"
+#include "arch/x86-64/arch/arch_irq.hpp"
 #include <array>
 #include <cstdint>
 #include <expected>
@@ -26,7 +26,7 @@ namespace Syscalls {
     extern "C" void syscall_hanlder();
     extern "C" void do_syscall_64(x86::Syscalls::SyscallFrame* frame);
 
-    constexpr auto MAX_SYSCALLS = 512;
+    inline constexpr auto MAX_SYSCALLS = 512;
 
     using syscall_fn = auto (*)(x86::Syscalls::SyscallFrame* frame) -> std::uint64_t;
     
@@ -36,7 +36,11 @@ namespace Syscalls {
     inline std::array<syscall_fn, MAX_SYSCALLS> global_syscall {};
 
     inline void init_syscalls() {
+        global_syscall[1] = write;
+        global_syscall[9] = mmap;
+        global_syscall[12] = brk;
         global_syscall[39] = get_pid;
+        global_syscall[58] = fork;
         global_syscall[60] = exit;
     }
 }

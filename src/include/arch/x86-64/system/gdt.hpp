@@ -18,16 +18,16 @@ Kernel Data Segment
 Selector 0x10: kernel data (64-bit)
 
 User Data Segment
-Selector 0x20: user data (64-bit)
+Selector 0x18: user data (64-bit, ring 3)
 
-User Code Segment 
-Selector 0x18: user code (64-bit, ring 3)
+User Code Segment
+Selector 0x20: user code (64-bit, ring 3)
 
 TDD
 */
 
 namespace x86::System::Gdt {
-    static std::uint64_t gdt_entries[7];
+    inline std::uint64_t gdt_entries[7];
 
     struct GDTR {
         std::uint16_t limit;

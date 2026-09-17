@@ -70,6 +70,10 @@ namespace Cpu {
     void init_syscall();
     void init_cpu();
 
+    /*
+        ! NOTE
+        * Setting up SMP we would probably need each cpu to have a GDT/IDT
+    */
     struct [[gnu::packed]] OneCpu {
         std::uint64_t syscall_kernel_rsp; 
         std::uint64_t syscall_user_rsp;  

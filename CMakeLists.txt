@@ -81,6 +81,39 @@ set(CMAKE_ASM_FLAGS "${CROSS_FLAGS}")
 
 set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/src/kernel/arch/x86-64/linker.lds)
 
+# ── Userspace test program ────────────────────────────────────────────────────
+# Built with its own flags -- the kernel's CROSS_FLAGS (-mcmodel=kernel,
+# -mno-sse, -mno-red-zone) are wrong for a ring-3 binary. -static -fno-pie
+# keeps it ET_EXEC; elf_check_supported() rejects ET_DYN.
+# -mgeneral-regs-only: the kernel never enables SSE or saves FPU state.
+# Plain C, so there's no C++ runtime to worry about.
+# --image-base puts the ELF headers and .text together at 0x400000.
+set(USER_INIT_ELF ${CMAKE_BINARY_DIR}/user_init.elf)
+set(USER_INIT_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/user/entry.c
+    ${CMAKE_SOURCE_DIR}/src/user/syscall.c
+)
+
+add_custom_command(
+    OUTPUT  ${USER_INIT_ELF}
+    COMMAND ${CMAKE_C_COMPILER}
+            -target x86_64-unknown-none -std=c11
+            -ffreestanding -nostdlib -static -fno-pie
+            -fno-stack-protector -mgeneral-regs-only -fuse-ld=lld
+            -Wall -Wextra
+            -I${CMAKE_SOURCE_DIR}/src/include
+            -Wl,--image-base=0x400000 -Wl,--build-id=none -Wl,-e,_start
+            -o ${USER_INIT_ELF}
+            ${USER_INIT_SOURCES}
+    DEPENDS ${USER_INIT_SOURCES} ${CMAKE_SOURCE_DIR}/src/user/syscall.h
+            ${CMAKE_SOURCE_DIR}/src/user/utest.h
+            ${CMAKE_SOURCE_DIR}/src/include/arch/x86-64/arch/sysv_syscalls.h
+    COMMENT "Building userspace user_init.elf"
+)
+# Not linked into the kernel image -- the iso target ships it as a Limine
+# module (module_path in limine.conf) and kmain loads it as the init process.
+add_custom_target(user_init ALL DEPENDS ${USER_INIT_ELF})
+
 set(KERNEL_SOURCES
     src/kmain.cpp
     src/kernel/boot/boot.cpp
@@ -109,6 +142,7 @@ set(KERNEL_SOURCES
     src/kernel/tests/keyboard_buffer_tests.cpp
     src/kernel/tests/keyboard_irq_tests.cpp
     src/kernel/tests/elf_tests.cpp
+    src/kernel/tests/syscall_tests.cpp
     src/kernel/arch/x86-64/dev/keyboard.cpp
     src/kernel/drivers/pit.cpp
     src/kernel/drivers/ps2.cpp
@@ -130,8 +164,8 @@ add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCE
     src/include/std/atomic
     src/kernel/exe/elf_loader.cpp
     src/kernel/arch/x86-64/arch/cpu.cpp
-    src/include/arch/x86-64/arch/syscall.hpp
-    src/kernel/arch/x86-64/arch/syscall.cpp
+    src/include/sys/syscalls.hpp
+    src/kernel/sys/syscalls.cpp
     src/kernel/arch/x86-64/arch/syscall.s
     src/include/arch/x86-64/arch/arch_syscalls.hpp)
 
@@ -204,7 +238,7 @@ set(ISO_OUT   ${CMAKE_BINARY_DIR}/twokernel.iso)
 set(LIMINE_CONF ${CMAKE_SOURCE_DIR}/src/kernel/limine.conf)
 
 add_custom_target(iso
-    DEPENDS twokernel.elf limine_host
+    DEPENDS twokernel.elf limine_host user_init
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${ISO_ROOT}
     COMMAND ${CMAKE_COMMAND} -E make_directory
         ${ISO_ROOT}/boot/limine
@@ -213,6 +247,8 @@ add_custom_target(iso
     COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:twokernel.elf>
         ${ISO_ROOT}/boot/kernel
+
+    COMMAND ${CMAKE_COMMAND} -E copy ${USER_INIT_ELF} ${ISO_ROOT}/boot/user_init.elf
 
     COMMAND ${CMAKE_COMMAND} -E copy ${LIMINE_CONF} ${ISO_ROOT}/boot/limine/limine.conf
 

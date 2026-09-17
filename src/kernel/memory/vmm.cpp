@@ -15,8 +15,8 @@ extern "C" void* _data_end[];
 
 namespace Memory::Vmm {
     void init() {
-        kernel_space = new_pagemap();
-        fill_kernel_entries(kernel_space);
+        g_kernel_space = new_pagemap();
+        fill_kernel_entries(g_kernel_space);
       
 //        Util::klog("Mapping Kernel Space\n");
         const auto* memmap = Limine::memmap.response;
@@ -31,7 +31,7 @@ namespace Memory::Vmm {
 
                 std::uint64_t v_addr = Limine::get_hhdm() + entry->base;
 
-                map(*kernel_space.pml4, entry->base, v_addr, entry->length,PRESENT | WRITEABLE | NX);
+                map(*g_kernel_space.pml4, entry->base, v_addr, entry->length,PRESENT | WRITEABLE | NX);
             }
         }
         // Util::klog("Finished mapping Kernel's Virtual address\n");
@@ -53,9 +53,12 @@ namespace Memory::Vmm {
         lo |= (1 << 11);
         asm volatile("wrmsr" :: "c"(Cpu::MSREFER), "a"(lo), "d"(hi));
 
-        load_cr3(kernel_space.pml4_pa);
+        load_cr3(g_kernel_space.pml4_pa);
         // Util::klog("VMM loaded CR3=0x%llx\n", kernel_space.pml4_pa);
+    }
 
+    void reclaim_bootloader_ranges() {
+        const auto* memmap = Limine::memmap.response;
         for (std::size_t i = 0; i < memmap->entry_count; i++) {
             auto* entry = memmap->entries[i];
 
@@ -63,8 +66,8 @@ namespace Memory::Vmm {
                 continue;
             }
 
-            auto _page_amount = entry->length / PAGE_SIZE;
-            Pmm::reclaim_bootloader(entry->type, entry->base, _page_amount);
+            auto page_amount = entry->length / PAGE_SIZE;
+            Pmm::reclaim_bootloader(entry->type, entry->base, page_amount);
         }
     }
 
@@ -72,7 +75,7 @@ namespace Memory::Vmm {
         std::size_t length = end - start;
         std::uint64_t pa = start - Limine::kernel_address.response->virtual_base + Limine::kernel_address.response->physical_base;
         
-        map(*kernel_space.pml4, pa, start, length, flags);
+        map(*g_kernel_space.pml4, pa, start, length, flags);
     }
 
     void map(struct PageMap& pagemap, std::uint64_t pa, std::uint64_t va, 
@@ -146,10 +149,10 @@ namespace Memory::Vmm {
     }
 
     std::uint64_t va_to_pa(struct VAddressSpace& space, std::uint64_t va) {
-        std::size_t pml4_entry = (va & (static_cast<std::uint64_t>(0x1ff) << 39)) >> 39;
-        std::size_t pdpt_entry = (va & (static_cast<std::uint64_t>(0x1ff) << 30)) >> 30;
-        std::size_t pd_entry   = (va & (static_cast<std::uint64_t>(0x1ff) << 21)) >> 21;
-        std::size_t pt_entry   = (va & (static_cast<std::uint64_t>(0x1ff) << 12)) >> 12;
+        std::size_t pml4_entry = (va & (static_cast<std::size_t>(0x1ff) << 39)) >> 39;
+        std::size_t pdpt_entry = (va & (static_cast<std::size_t>(0x1ff) << 30)) >> 30;
+        std::size_t pd_entry   = (va & (static_cast<std::size_t>(0x1ff) << 21)) >> 21;
+        std::size_t pt_entry   = (va & (static_cast<std::size_t>(0x1ff) << 12)) >> 12;
 
         PageMap* pdpt = get_next_level(*space.pml4, pml4_entry, 0, false);
         PageMap* pd   = get_next_level(*pdpt,      pdpt_entry, 0, false);
@@ -162,20 +165,67 @@ namespace Memory::Vmm {
         // Util::klog("kernel_space upper half vaddress init\n");        
         for (std::size_t i = 256; i < 512; i++) {
             std::uint64_t pdpt_pa = Pmm::alloc(1);
+            
             if (pdpt_pa == 0) {
                 Util::klog_panic("Pmm::alloc(1) failed in fill_kernel_entries() -- out of physical memory\n");
             }
+
             auto* pdpt = reinterpret_cast<PageMap*>(pdpt_pa + Limine::get_hhdm());
-            LibC::memset(pdpt->entries.data(), 0, sizeof(pdpt->entries));
+            LibC::memset(pdpt->entries.data(), 0, sizeof(pdpt->entries)); // ! this would be 4kb ~Pagesize
             asm volatile("sfence" : : : "memory"); // Ensure zeroing is visible before entry is set.
             vaddr.pml4->entries[i] = pdpt_pa | PRESENT | WRITEABLE;
         }
         // Util::klog("finished kernel_space upper half vaddress init\n");
     }
 
+    void free_table(PageMap& table, std::size_t level, std::size_t count) {
+        for (std::size_t i = 256; i < count; i++) {
+            const std::uint64_t entry = table.entries[i];
+            
+            if (!(entry & PRESENT)) {
+                continue;
+            }
+
+            const std::uint64_t pa = entry & PADDR_MASK;
+
+            if (level > 1) {
+                free_table(*reinterpret_cast<PageMap*>(pa + Limine::get_hhdm()), level - 1);
+            }
+
+            Pmm::free(pa, 1);
+            table.entries[i] = 0;
+        }
+    }
+
+    void free_pagemap(struct VAddressSpace& space) {
+        if (space.pml4 == nullptr || space.pml4_pa == 0) {
+            return;
+        }
+
+        free_table(*space.pml4);
+        Pmm::free(space.pml4_pa, 1);
+
+        space.pml4 = nullptr;
+        space.pml4_pa = 0;
+    }
+
     void process_fill_kernel_entries(struct VAddressSpace& vaddr) {
         for (std::size_t i = 256; i < 512; i++) {
-            vaddr.pml4->entries[i] = kernel_space.pml4->entries[i];
+            vaddr.pml4->entries[i] = g_kernel_space.pml4->entries[i];
         }
+    }
+
+    std::uint8_t* kmalloc(std::size_t pages) {
+        auto new_pa = Pmm::alloc(pages);
+
+        auto va = reinterpret_cast<std::uint8_t*>(new_pa + Limine::get_hhdm());
+        return va;
+    }
+
+    void kfree(std::uint8_t* va, std::size_t pages) {
+        auto va_2 = reinterpret_cast<std::uint64_t>(va);
+        auto pa = static_cast<std::uint64_t>(va_2 - Limine::get_hhdm());
+
+        Pmm::free(pa, pages);
     }
 }

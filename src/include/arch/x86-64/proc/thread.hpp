@@ -43,13 +43,6 @@ namespace x86::Proc::Thread {
     };
 
     using FuncPtr = void (*)(void*);   
-
-    /* 
-        ! Note 
-        ! struct member vars matters for debugger 
-     */
-    
-    // Todo: add user stack
     struct ThreadBlock {
         std::string_view m_name {};
 
@@ -69,7 +62,8 @@ namespace x86::Proc::Thread {
         //std::uint64_t userspace_time_ms = 0;
         //std::uint64_t kernelspace_time_ms = 0;
 
-        std::uintptr_t pa;
+        std::uintptr_t kernel_pa;
+        std::uintptr_t user_stack_pa {}; 
 
         FuncPtr m_entry {};
 
@@ -81,6 +75,7 @@ namespace x86::Proc::Thread {
         void exit();
         void reset();
         void init_kernel_stack();
+        void init_user_stack();
 
         // Basically the create_kernel_task inside Brendan's Multi-taskng Tutorial
         ThreadBlock(std::string_view name, Process::ProcessBlock* process, FuncPtr entry, void* args);

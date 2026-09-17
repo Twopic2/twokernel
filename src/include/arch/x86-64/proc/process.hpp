@@ -16,7 +16,7 @@ to things like file handles. All of this information is stored in a process cont
 */
 
 
-//* TODO: Right now there is something wrong with page faults when it comes to process. 
+// TODO Right now there is something wrong with page faults when it comes to process. 
 //* I'm going to try and get some better PF errors
 
 namespace x86::Proc::Process {
@@ -30,6 +30,10 @@ namespace x86::Proc::Process {
     };
 
     inline std::uint16_t total_pid = 0;
+    
+    /* 
+        TODO add STDIN, STDOUT, STDERR
+    */
     struct ProcessBlock {
         kstd::SingleDeque<Thread::ThreadBlock, &Thread::ThreadBlock::proc_hook> threads;
         Thread::ThreadBlock* curr_thread {}; 
@@ -53,6 +57,7 @@ namespace x86::Proc::Process {
         void exit(int stats = 0);
         
         inline void remove_all_threads() {
+            Util::IrqGaurd irq {};
             threads.clear_all();    
         }
     };

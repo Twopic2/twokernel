@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <limine.h>
 #include <std/cstdint>
+#include <string_view>
 
 namespace Limine {
     extern volatile limine_framebuffer_request framebuffer_request;
@@ -63,6 +64,34 @@ namespace Limine {
         .response = nullptr,
         .stack_size = 0x100000
     };
+
+    // ? Files listed with module_path in limine.conf
+    [[gnu::used, gnu::section(".limine_requests")]]
+    inline volatile limine_module_request module_request
+    {
+        .id = LIMINE_MODULE_REQUEST_ID,
+        .revision = 0,
+        .response = nullptr,
+        .internal_module_count = 0,
+        .internal_modules = nullptr
+    };
+
+    // Matches on the end of the module's path, e.g. "user_init.elf"
+    inline limine_file* find_module(std::string_view name) {
+        const auto* response = module_request.response;
+        if (response == nullptr) {
+            return nullptr;
+        }
+
+        for (std::uint64_t i = 0; i < response->module_count; i++) {
+            auto* file = response->modules[i];
+            if (std::string_view {file->path}.ends_with(name)) {
+                return file;
+            }
+        }
+
+        return nullptr;
+    }
 
      // write into or read from a physical address
     inline std::uint64_t get_hhdm() {

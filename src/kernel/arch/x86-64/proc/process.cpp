@@ -8,7 +8,7 @@
 namespace x86::Proc::Process {
     ProcessBlock::ProcessBlock(std::string_view name, bool user) :
     is_user(user), is_dead(false), m_name(name) {
-       // Util::IrqGaurd irq {};
+       Util::IrqGaurd irq {};
         vaddr = Memory::Vmm::new_pagemap();
         Memory::Vmm::process_fill_kernel_entries(vaddr);
         status = ProcStats::Ready;
@@ -17,7 +17,7 @@ namespace x86::Proc::Process {
     }
 
     ProcessBlock::ProcessBlock() {
-    //    Util::IrqGaurd irq {};
+        Util::IrqGaurd irq {};
         vaddr = Memory::Vmm::new_pagemap();
         Memory::Vmm::process_fill_kernel_entries(vaddr);
         status = ProcStats::Ready;
@@ -26,7 +26,7 @@ namespace x86::Proc::Process {
     }
 
     void ProcessBlock::add_thread(Thread::ThreadBlock* thread) {
-        //Util::IrqGaurd irq {};
+        Util::IrqGaurd irq {};
         thread->m_process = this;
         threads.push_tail(thread);
         thread_size++;
@@ -35,7 +35,7 @@ namespace x86::Proc::Process {
     }
 
     void ProcessBlock::exit(int stats) {
-        //Util::IrqGaurd irq {};
+        Util::IrqGaurd irq {};
         if (stats == -1) {
             status = ProcStats::Dead;
             is_dead = true;

@@ -49,7 +49,7 @@ namespace x86::System::Idt {
 
     void x86_gp_fault_handler(ArchIrq::IrqFrame* frame) {
         auto thread = Proc::Scheduler::g_scheduler.get_current_thread();
-        if (thread->m_process->is_user && frame->cs == USER_CODE) {
+        if (thread->m_process->is_user && (frame->cs & 3) == 3) {
             Util::klog("killing user process");
             thread->m_process->exit(-1);
             Proc::Scheduler::g_scheduler.schedule();

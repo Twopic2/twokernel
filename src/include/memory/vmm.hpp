@@ -49,17 +49,39 @@ namespace Memory::Vmm {
 
     inline constexpr std::size_t PAGE_SIZE = 0x1000;
 
+    inline constexpr std::uint64_t USER_STACK_TOP = 0x7FFFFFFFF000;
+    inline constexpr std::uint64_t USER_ADDR_END = 0x0000800000000000;
+
     // Direct Map way since its way easier 
     struct PageMap {
         std::array<std::uint64_t, 512> entries;
     };
 
+    /**
+        * @note 
+        Took some ideas from this repo 
+
+        https://github.com/SerenityOS/serenity/blob/master/Kernel/Memory/VirtualAddress.h
+    */
     struct VAddressSpace {
         struct PageMap* pml4;
         std::uint64_t pml4_pa;
+
+        auto operator<=>(const VAddressSpace& other) const {
+            return pml4_pa <=> other.pml4_pa;
+        }
+
+        auto operator==(const VAddressSpace& other) const {
+            return pml4_pa == other.pml4_pa;
+        }
+
+        [[nodiscard]] std::uint8_t* as_ptr() {
+            auto ptr = reinterpret_cast<std::uint8_t*>(pml4_pa);
+            return ptr;
+        }
     }; 
     
-    inline struct VAddressSpace kernel_space;
+    inline struct VAddressSpace g_kernel_space;
 
     // Credit to RaidtheWeb
     static inline void flush_tlb() {
@@ -92,17 +114,13 @@ namespace Memory::Vmm {
         return VAddressSpace{ .pml4 = pml4, .pml4_pa = pa };
     }
 
-    inline void free_pagemap(std::uint64_t pa) {
-        if (pa == 0) {
-            Util::klog_panic("Pmm::alloc(1) failed in new_pagemap() -- out of physical memory\n");
-            return;
-        }
-        Pmm::free(pa, 1);
-    }
+    void free_pagemap(struct VAddressSpace& space);
+    void free_table(PageMap& table, std::size_t level = 4, std::size_t count = 512);
 
     PageMap* get_next_level(struct PageMap& entry, std::size_t index, std::uint64_t flags, bool allocates);
 
     void fill_kernel_entries(struct VAddressSpace& vaddr);
+    void reclaim_bootloader_ranges();
     void map_limine_kernel_addr(std::uint64_t start, std::uint64_t end, std::uint64_t flags);
     void map(struct PageMap& pagemap, std::uint64_t pa, std::uint64_t va, std::size_t length, std::uint64_t flags);
     /* PageMap no longer points to pa */
@@ -110,9 +128,9 @@ namespace Memory::Vmm {
 
     std::uint64_t va_to_pa(struct VAddressSpace& space, std::uint64_t va);
     void process_fill_kernel_entries(struct VAddressSpace& vaddr);
-    
-    //void* vm_alloc(std::size_t pages, std::uint64_t flags);
-    //void  vm_free(void* va, std::size_t pages);
+   
+    std::uint8_t* kmalloc(std::size_t pages);
+    void kfree(std::uint8_t* va);
 
     void init();
 }
