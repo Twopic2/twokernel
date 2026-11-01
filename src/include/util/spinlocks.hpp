@@ -49,14 +49,18 @@ namespace Util {
         IrqSpinLock operator=(IrqSpinLock&&) = delete;
 
         void acquire() noexcept {
-            __asm volatile("pushfq; pop %0" : "=r"(flags) :: "memory");
-            inner.acquire();
+            std::uint64_t saved_flags;
+            __asm volatile("pushfq; pop %0" : "=r"(saved_flags) :: "memory");
+            // Mask interrupts before spinning to prevent local re-entry.
             Cpu::cli();
+            inner.acquire();
+            flags = saved_flags;
         }
 
         void release() noexcept {
+            const auto saved_flags = flags;
             inner.release();
-            if (flags & (1ull << 9)) // IF Mask 
+            if (saved_flags & (1ull << 9)) // IF Mask
             {
                 Cpu::sti();
             }

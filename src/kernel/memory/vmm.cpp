@@ -230,7 +230,7 @@ namespace Memory::Vmm {
             auto* pdpt = reinterpret_cast<PageMap*>(pdpt_pa + Limine::get_hhdm());
             LibC::memset(pdpt->entries.data(), 0, sizeof(pdpt->entries)); // ! this would be 4kb ~Pagesize
             asm volatile("sfence" : : : "memory"); // Ensure zeroing is visible before entry is set.
-            page_directory.pml4->entries[i] = pdpt_pa | PRESENT | WRITEABLE | USER | NX;
+            page_directory.pml4->entries[i] = pdpt_pa | PRESENT | WRITEABLE | USER ;
         }
     }
 }

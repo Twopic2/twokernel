@@ -14,8 +14,8 @@
 }
 
 void kmalloc_free(std::uint8_t* k_ptr) {
-    KmallocHeader* header = reinterpret_cast<KmallocHeader*>(k_ptr - 1);
-    auto pa = reinterpret_cast<std::uint64_t>(k_ptr - Limine::get_hhdm());
+    KmallocHeader* header = reinterpret_cast<KmallocHeader*>(k_ptr) - 1;
+    auto pa = reinterpret_cast<std::uint64_t>(header) - Limine::get_hhdm();
     Memory::Pmm::free(pa, header->pages);
 }
 
