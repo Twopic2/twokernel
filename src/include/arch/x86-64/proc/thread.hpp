@@ -6,30 +6,21 @@
 #include <arch/x86-64/arch/arch_irq.hpp>
 #include <std/single_deque.hpp>
 #include <util/irq_gaurd.hpp>
+#include <optional>
 
 /* 
-Credit: Brendan's Multi-tasking Tutorial wiki
+    * Credit: Brendan's Multi-tasking Tutorial wiki
+ 
+    * Kernel thread stack size should be around 16 KiB
 
-Thread Control Block
-context switching with rsp
-Kernel Stack
-scheduling
-
-While the code a thread is running can be shared, 
-each thread must have its own stack and context (saved registers).
-*/
-
-/* 
-Kernel thread stack size should be around 16 KiB
-
-User space thread stacks might be higher at around 1MiB
+    * User space thread stacks might be higher at around 1MiB
 */
 
 namespace x86::Proc::Process { struct ProcessBlock; }
 
 namespace x86::Proc::Thread {
     inline constexpr std::uint64_t DEFAULT_SCHEDULE_TIME_MS = 6; 
-    inline std::uint64_t total_tid {};
+    inline std::uint64_t g_total_tid {};
     inline constexpr auto SET_RFLAGS = 0x202;
     inline constexpr auto THREAD_KERNEL_SIZE = 4 * Memory::Vmm::PAGE_SIZE;
 
@@ -38,8 +29,6 @@ namespace x86::Proc::Thread {
         Running,
 		Blocked,
         Sleep,
-        Zombie,
-        Dead
     };
 
     using FuncPtr = void (*)(void*);   
@@ -52,18 +41,19 @@ namespace x86::Proc::Thread {
         ThreadState state;
         std::uint16_t thread_id;
         ArchIrq::IrqFrame registers {};
-
-        std::uint64_t exec_start_ms {}; // ! when the thread goes to the running queue 
-        std::uint64_t total_runtime_ms {};
-        std::uint64_t scheduled_time; // ! So far default is 6ms as suggested by ilobilo
+        
+        std::uint64_t exec_start_ms {}; // * Time when it enters the ready queue
+        std::uint64_t total_runtime_ms {}; // * Total time within running state  
+        std::uint64_t scheduled_time; // * So far default is 6ms as suggested by ilobilo
         std::uint64_t sleep_time {};
         // std::uint64_t prev_runtime {}; 
 
-        //std::uint64_t userspace_time_ms = 0;
-        //std::uint64_t kernelspace_time_ms = 0;
+        std::uint64_t userspace_time_ms = 0;
+        std::uint64_t kernelspace_time_ms = 0;
 
+        // ? WHy is this here
         std::uintptr_t kernel_pa;
-        std::uintptr_t user_stack_pa {}; 
+        std::optional<std::uintptr_t> user_stack_pa {}; 
 
         FuncPtr m_entry {};
 
@@ -73,9 +63,10 @@ namespace x86::Proc::Thread {
         kstd::SingleNode proc_hook {};
 
         void exit();
-        void reset();
+        void reset_scheduled_time();
         void init_kernel_stack();
         void init_user_stack();
+        void update_scheduled_time(std::uint64_t ms);
 
         // Basically the create_kernel_task inside Brendan's Multi-taskng Tutorial
         ThreadBlock(std::string_view name, Process::ProcessBlock* process, FuncPtr entry, void* args);

@@ -5,14 +5,14 @@
 
 namespace Tests {
     TEST_CASE("Vmm::init built the kernel address space", "[vmm]") {
-        REQUIRE(Memory::Vmm::g_kernel_space.pml4 != nullptr);
-        CHECK(Memory::Vmm::g_kernel_space.pml4_pa != 0);
+        REQUIRE(Memory::Vmm::g_kernel_page_directory.pml4 != nullptr);
+        CHECK(Memory::Vmm::g_kernel_page_directory.pml4_pa != 0);
     }
 
     TEST_CASE("all upper half PML4 entries (256-511) are present", "[vmm]") {
         bool upper_half_ok = true;
         for (std::size_t i = 256; i < 512; i++) {
-            if (!(Memory::Vmm::g_kernel_space.pml4->entries[i] & Memory::Vmm::PRESENT)) {
+            if (!(Memory::Vmm::g_kernel_page_directory.pml4->entries[i] & Memory::Vmm::PRESENT)) {
                 upper_half_ok = false;
                 break;
             }
@@ -25,7 +25,7 @@ namespace Tests {
         REQUIRE(phys != 0);
 
         std::uint64_t hhdm_va  = phys + Limine::get_hhdm();
-        std::uint64_t recovered = Memory::Vmm::va_to_pa(Memory::Vmm::g_kernel_space, hhdm_va);
+        std::uint64_t recovered = Memory::Vmm::va_to_pa(Memory::Vmm::g_kernel_page_directory, hhdm_va);
         CHECK(recovered == phys);
 
         Memory::Pmm::free(phys, 1);

@@ -202,7 +202,7 @@ namespace Tests {
     }
 
     TEST_CASE("getpid returns the pid of the current process", "[syscall]") {
-        CurrentThreadGuard guard {&Sched::global_idle};
+        CurrentThreadGuard guard {&Sched::g_idle};
 
         auto* proc = Sched::g_scheduler.get_current_process();
         REQUIRE(proc != nullptr);

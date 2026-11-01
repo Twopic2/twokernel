@@ -6,6 +6,7 @@
 #include <arch/x86-64/system/gdt.hpp>
 #include <drivers/pit.hpp>
 #include <cstdint>
+#include <initializer_list>
 
 namespace Tests {
     using namespace x86::Proc;
@@ -43,6 +44,7 @@ namespace Tests {
 
             g_scheduler.disable_counter      = 0;
             g_scheduler.task_switch_postponed = false;
+            g_scheduler.time_quantum_past     = false;
 
             *g_scheduler.idle_thread = idle_pristine_snapshot();
         }
@@ -57,6 +59,10 @@ namespace Tests {
             // forward would otherwise leak that clock into every later test.
             std::uint64_t saved_clocks = Drivers::Pit::pit_clocks;
             std::uint64_t saved_tick   = Drivers::Pit::tick;
+            std::uint64_t saved_seconds = Drivers::Pit::seconds;
+            std::uint64_t saved_milliseconds = Drivers::Pit::milli_seconds;
+            std::uint64_t saved_rsp0 = x86::System::Gdt::tss.rsp0;
+            std::uint64_t saved_syscall_rsp = Cpu::bsp_cpu.syscall_kernel_rsp;
 
             SchedFixture() {
                 reset_sched();
@@ -66,6 +72,10 @@ namespace Tests {
                 Memory::Vmm::load_cr3(kernel_cr3);
                 Drivers::Pit::pit_clocks = saved_clocks;
                 Drivers::Pit::tick       = saved_tick;
+                Drivers::Pit::seconds = saved_seconds;
+                Drivers::Pit::milli_seconds = saved_milliseconds;
+                x86::System::Gdt::tss.rsp0 = saved_rsp0;
+                Cpu::bsp_cpu.syscall_kernel_rsp = saved_syscall_rsp;
             }
         };
 
@@ -78,11 +88,60 @@ namespace Tests {
             g_scheduler.pit_irq_handler(frame);
         }
 
-        // Ticks are ~1ms apart, so a 10ms slice needs ~10 of them.
+        // The configured 1000 Hz PIT advances the test clock by 1 ms per tick.
         void tick_for_ms(x86::ArchIrq::IrqFrame* frame, std::uint64_t ms) {
             for (std::uint64_t i = 0; i < ms; ++i) {
                 tick(frame);
             }
+        }
+
+        // Timing tests begin after dispatch: the running thread is outside
+        // ready_threads, and the other threads wait in FIFO order. Seeding
+        // this state directly also avoids add_ready_threads() resetting the
+        // custom budgets that these tests are meant to exercise.
+        void start_round_robin(Thread::ThreadBlock& running,
+                               std::initializer_list<Thread::ThreadBlock*> ready) {
+            running.state = Thread::ThreadState::Running;
+            running.exec_start_ms = Drivers::Pit::get_time_milliseconds();
+            g_scheduler.curr_thread = &running;
+            x86::System::Gdt::tss.rsp0 = reinterpret_cast<std::uint64_t>(running.rsp0);
+            Cpu::bsp_cpu.syscall_kernel_rsp = x86::System::Gdt::tss.rsp0;
+            Memory::Vmm::load_cr3(running.m_process->address_space.page_dir.pml4_pa);
+
+            for (auto* thread : ready) {
+                thread->state = Thread::ThreadState::Ready;
+                g_scheduler.ready_threads.push_tail(thread);
+            }
+        }
+
+        struct SliceExpectation {
+            Thread::ThreadBlock* running;
+            std::uint64_t duration_ms;
+            Thread::ThreadBlock* next;
+            std::uint64_t remaining_ms;
+        };
+
+        void check_slice(x86::ArchIrq::IrqFrame* frame, const SliceExpectation& slice) {
+            CHECK(g_scheduler.curr_thread == slice.running);
+            const auto runtime_before = slice.running->total_runtime_ms;
+
+            tick_for_ms(frame, slice.duration_ms - 1);
+            CHECK(g_scheduler.curr_thread == slice.running);
+            CHECK(slice.running->total_runtime_ms == runtime_before + slice.duration_ms - 1);
+
+            tick(frame);
+            CHECK(g_scheduler.curr_thread == slice.next);
+            CHECK(slice.next->state == Thread::ThreadState::Running);
+            CHECK(slice.running->state == Thread::ThreadState::Ready);
+            CHECK(slice.running->total_runtime_ms == runtime_before + slice.duration_ms);
+            CHECK(slice.running->scheduled_time == slice.remaining_ms);
+            CHECK(slice.next->exec_start_ms == Drivers::Pit::get_time_milliseconds());
+            CHECK(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(slice.next->rsp0));
+            CHECK(Cpu::bsp_cpu.syscall_kernel_rsp == x86::System::Gdt::tss.rsp0);
+            CHECK_FALSE(g_scheduler.time_quantum_past);
+            CHECK_FALSE(g_scheduler.task_switch_postponed);
+            CHECK(g_scheduler.task_switch_counter == 0);
+            CHECK(g_scheduler.disable_counter == 0);
         }
     }
 
@@ -97,6 +156,41 @@ namespace Tests {
                   == 4 * Memory::Vmm::PAGE_SIZE);
         // distinct threads own distinct kernel stacks
         CHECK(t0.kernel_stack != t1.kernel_stack);
+    }
+
+    TEST_CASE("kernel thread entry has an aligned stack and receives its argument", "[scheduler][thread-start]") {
+        SchedFixture fixture {};
+        int argument = 42;
+        Thread::ThreadBlock thread {"probe", &g_kernel_process, thread_a, &argument};
+        CHECK(thread.registers.rsp % 16 == 8);
+        CHECK(thread.registers.rsp == reinterpret_cast<std::uintptr_t>(thread.rsp0) - 8);
+        CHECK(thread.registers.rdi == reinterpret_cast<std::uintptr_t>(&argument));
+        CHECK(thread.registers.rip == reinterpret_cast<std::uintptr_t>(thread_a));
+        thread.exit();
+    }
+
+    TEST_CASE("the first scheduled thread keeps its entry frame until dispatched", "[scheduler][thread-start]") {
+        SchedFixture fixture {};
+        Schedule scheduler {g_scheduler.idle_thread};
+        REQUIRE(scheduler.curr_thread == scheduler.idle_thread);
+
+        Thread::ThreadBlock thread {"probe", &g_kernel_process, thread_a, nullptr};
+        const auto entry = thread.registers;
+        scheduler.add_ready_threads(&thread);
+        CHECK(scheduler.curr_thread == scheduler.idle_thread);
+
+        x86::ArchIrq::IrqFrame frame {};
+        for (std::uint64_t i = 0; i < Thread::DEFAULT_SCHEDULE_TIME_MS; ++i) {
+            Drivers::Pit::increase_tick();
+            Drivers::Pit::increase_time();
+            scheduler.pit_irq_handler(&frame);
+        }
+        CHECK(scheduler.curr_thread == &thread);
+        CHECK(thread.state == Thread::ThreadState::Running);
+        CHECK(frame.rip == entry.rip);
+        CHECK(frame.rsp == entry.rsp);
+        CHECK(scheduler.ready_threads.empty());
+        thread.exit();
     }
 
     TEST_CASE("schedule() runs the only ready thread and points TSS.rsp0 at it", "[scheduler]") {
@@ -144,10 +238,7 @@ namespace Tests {
         CHECK(x86::System::Gdt::tss.rsp0 == reinterpret_cast<std::uint64_t>(a.rsp0));
     }
 
-    // Each tick charges the running thread the wall time it actually spent on
-    // the cpu, so total_runtime_ms tracks elapsed milliseconds rather than a
-    // count of ticks.
-    TEST_CASE("PIT ticks charge the running thread real time", "[scheduler]") {
+    TEST_CASE("each PIT tick charges the running thread one millisecond", "[scheduler]") {
         SchedFixture fixture {};
         Process::ProcessBlock kproc {};
 
@@ -161,13 +252,12 @@ namespace Tests {
 
         x86::ArchIrq::IrqFrame frame {};
         tick(&frame);
-        CHECK(a.total_runtime_ms > 0);
+        CHECK(a.total_runtime_ms == 1);
 
         // A tick is 1ms, so five of them land inside the default slice and
         // the thread is still the one on the cpu.
-        const auto after_one = a.total_runtime_ms;
         tick_for_ms(&frame, 4);
-        CHECK(a.total_runtime_ms > after_one);
+        CHECK(a.total_runtime_ms == 5);
         CHECK(g_scheduler.curr_thread == &a);
     }
 
@@ -187,19 +277,14 @@ namespace Tests {
 
         x86::ArchIrq::IrqFrame frame {};
 
-        // A single ~1ms tick lands well inside a's slice.
-        tick(&frame);
+        tick_for_ms(&frame, Thread::DEFAULT_SCHEDULE_TIME_MS - 1);
         CHECK(g_scheduler.curr_thread == &a);
 
-        // Cross the slice boundary exactly once and the cpu goes to b. Driven
-        // off the constant so retuning DEFAULT_SCHEDULE_TIME_MS doesn't silently make
-        // this tick past a second rotation and land back on a.
-        tick_for_ms(&frame, Thread::DEFAULT_SCHEDULE_TIME_MS);
+        tick(&frame);
         CHECK(g_scheduler.curr_thread == &b);
     }
 
-    // A short slice expires sooner than a long one -- the point of moving the
-    // quantum onto the TCB.
+    // A per-thread budget can expire before the scheduler's quantum cap.
     TEST_CASE("a thread with a shorter slice is preempted sooner", "[scheduler]") {
         SchedFixture fixture {};
         Process::ProcessBlock kproc {};
@@ -207,22 +292,153 @@ namespace Tests {
         Thread::ThreadBlock a {}; a.m_name = "a"; a.m_process = &kproc;
         Thread::ThreadBlock b {}; b.m_name = "b"; b.m_process = &kproc;
 
-        a.scheduled_time = 3;   // 3ms
-
-        g_scheduler.add_ready_threads(&a);
-        g_scheduler.add_ready_threads(&b);
-        g_scheduler.schedule();
+        a.update_scheduled_time(3);
+        start_round_robin(a, {&b});
         REQUIRE(g_scheduler.curr_thread == &a);
 
         x86::ArchIrq::IrqFrame frame {};
+        check_slice(&frame, {&a, 3, &b, Thread::DEFAULT_SCHEDULE_TIME_MS});
+        CHECK(b.total_runtime_ms == 0);
+    }
 
-        // Still inside a's 3ms slice.
-        tick(&frame);
+    TEST_CASE("mixed budgets A=6 B=120 C=70 rotate and preserve B's remainder", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+        Thread::ThreadBlock a {}; a.m_name = "A"; a.m_process = &kproc;
+        Thread::ThreadBlock b {}; b.m_name = "B"; b.m_process = &kproc;
+        Thread::ThreadBlock c {}; c.m_name = "C"; c.m_process = &kproc;
+
+        a.update_scheduled_time(6);
+        b.update_scheduled_time(120);
+        c.update_scheduled_time(70);
+        a.registers.rip = 0xA0;
+        b.registers.rip = 0xB0;
+        c.registers.rip = 0xC0;
+        start_round_robin(a, {&b, &c});
+
+        // At a 100 ms quantum: A(6), B(100), C(70), A(6), B(20).
+        // Exhausted budgets reset to the thread default; B keeps its final
+        // 20 ms while C and A take their turns.
+        const SliceExpectation timeline[] {
+            {&a, 6, &b, Thread::DEFAULT_SCHEDULE_TIME_MS},
+            {&b, DEFAULT_TIME_QUANTUM, &c, 120 - DEFAULT_TIME_QUANTUM},
+            {&c, 70, &a, Thread::DEFAULT_SCHEDULE_TIME_MS},
+            {&a, Thread::DEFAULT_SCHEDULE_TIME_MS, &b, Thread::DEFAULT_SCHEDULE_TIME_MS},
+            {&b, 120 - DEFAULT_TIME_QUANTUM, &c, Thread::DEFAULT_SCHEDULE_TIME_MS},
+        };
+
+        auto frame = a.registers;
+        for (const auto& slice : timeline) {
+            SECTION(slice.running->m_name.data()) {
+                check_slice(&frame, slice);
+                CHECK(g_scheduler.ready_threads.size() == 2);
+                const auto expected_rip = slice.next == &a ? 0xA0u
+                    : slice.next == &b ? 0xB0u : 0xC0u;
+                CHECK(frame.rip == expected_rip);
+            }
+        }
+
+        CHECK(a.total_runtime_ms == 6 + Thread::DEFAULT_SCHEDULE_TIME_MS);
+        CHECK(b.total_runtime_ms == 120);
+        CHECK(c.total_runtime_ms == 70);
+        CHECK(a.scheduled_time == Thread::DEFAULT_SCHEDULE_TIME_MS);
+        CHECK(b.scheduled_time == Thread::DEFAULT_SCHEDULE_TIME_MS);
+        CHECK(c.scheduled_time == Thread::DEFAULT_SCHEDULE_TIME_MS);
+    }
+
+    TEST_CASE("mixed budgets split a 250 ms thread across multiple round-robin turns", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+        Thread::ThreadBlock a {}; a.m_name = "A"; a.m_process = &kproc;
+        Thread::ThreadBlock b {}; b.m_name = "B"; b.m_process = &kproc;
+        Thread::ThreadBlock c {}; c.m_name = "C"; c.m_process = &kproc;
+
+        a.update_scheduled_time(6);
+        b.update_scheduled_time(70);
+        c.update_scheduled_time(2 * DEFAULT_TIME_QUANTUM + 50);
+        start_round_robin(a, {&b, &c});
+
+        // C runs for 100, 100, then 50 ms, with A and B in between.
+        const SliceExpectation timeline[] {
+            {&a, 6, &b, Thread::DEFAULT_SCHEDULE_TIME_MS},
+            {&b, 70, &c, Thread::DEFAULT_SCHEDULE_TIME_MS},
+            {&c, DEFAULT_TIME_QUANTUM, &a, DEFAULT_TIME_QUANTUM + 50},
+            {&a, Thread::DEFAULT_SCHEDULE_TIME_MS, &b, Thread::DEFAULT_SCHEDULE_TIME_MS},
+            {&b, Thread::DEFAULT_SCHEDULE_TIME_MS, &c, Thread::DEFAULT_SCHEDULE_TIME_MS},
+            {&c, DEFAULT_TIME_QUANTUM, &a, 50},
+            {&a, Thread::DEFAULT_SCHEDULE_TIME_MS, &b, Thread::DEFAULT_SCHEDULE_TIME_MS},
+            {&b, Thread::DEFAULT_SCHEDULE_TIME_MS, &c, Thread::DEFAULT_SCHEDULE_TIME_MS},
+            {&c, 50, &a, Thread::DEFAULT_SCHEDULE_TIME_MS},
+        };
+
+        x86::ArchIrq::IrqFrame frame {};
+        for (const auto& slice : timeline) {
+            SECTION(slice.running->m_name.data()) {
+                check_slice(&frame, slice);
+                CHECK(g_scheduler.ready_threads.size() == 2);
+            }
+        }
+
+        CHECK(a.total_runtime_ms == 6 + 2 * Thread::DEFAULT_SCHEDULE_TIME_MS);
+        CHECK(b.total_runtime_ms == 70 + 2 * Thread::DEFAULT_SCHEDULE_TIME_MS);
+        CHECK(c.total_runtime_ms == 2 * DEFAULT_TIME_QUANTUM + 50);
+        CHECK(c.scheduled_time == Thread::DEFAULT_SCHEDULE_TIME_MS);
+    }
+
+    TEST_CASE("budgets below, equal to, and above the quantum switch at the correct boundary", "[scheduler]") {
+        const struct BudgetCase {
+            const char* name;
+            std::uint64_t ms;
+        } budgets[] {
+            {"1 ms", 1}, {"3 ms", 3}, {"6 ms", 6}, {"70 ms", 70},
+            {"quantum minus 1 ms", DEFAULT_TIME_QUANTUM - 1},
+            {"exactly one quantum", DEFAULT_TIME_QUANTUM},
+            {"quantum plus 1 ms", DEFAULT_TIME_QUANTUM + 1},
+            {"two quanta plus 50 ms", 2 * DEFAULT_TIME_QUANTUM + 50},
+        };
+
+        for (const auto& test : budgets) {
+            SchedFixture fixture {};
+            Process::ProcessBlock kproc {};
+            Thread::ThreadBlock a {}; a.m_name = "A"; a.m_process = &kproc;
+            Thread::ThreadBlock b {}; b.m_name = "B"; b.m_process = &kproc;
+
+            const auto budget = test.ms;
+            a.update_scheduled_time(budget);
+            start_round_robin(a, {&b});
+            const std::uint64_t duration = budget < DEFAULT_TIME_QUANTUM ? budget : DEFAULT_TIME_QUANTUM;
+            const std::uint64_t remaining = budget > DEFAULT_TIME_QUANTUM
+                ? budget - DEFAULT_TIME_QUANTUM : Thread::DEFAULT_SCHEDULE_TIME_MS;
+
+            x86::ArchIrq::IrqFrame frame {};
+            SECTION(test.name) {
+                check_slice(&frame, {&a, duration, &b, remaining});
+                CHECK(b.total_runtime_ms == 0);
+                CHECK(g_scheduler.ready_threads.size() == 1);
+            }
+        }
+    }
+
+    TEST_CASE("yield resets the remainder of a quantum-preempted thread", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+        Thread::ThreadBlock a {}; a.m_name = "A"; a.m_process = &kproc;
+        Thread::ThreadBlock b {}; b.m_name = "B"; b.m_process = &kproc;
+
+        b.update_scheduled_time(120);
+        start_round_robin(b, {&a});
+
+        x86::ArchIrq::IrqFrame frame {};
+        check_slice(&frame, {&b, DEFAULT_TIME_QUANTUM, &a, 120 - DEFAULT_TIME_QUANTUM});
+        g_scheduler.yield();
+        REQUIRE(g_scheduler.curr_thread == &b);
+        CHECK(b.scheduled_time == 120 - DEFAULT_TIME_QUANTUM);
+
+        g_scheduler.yield();
         CHECK(g_scheduler.curr_thread == &a);
-
-        // Past 3ms but short of the default slice -- a is out, b is in.
-        tick_for_ms(&frame, 4);
-        CHECK(g_scheduler.curr_thread == &b);
+        CHECK(b.scheduled_time == Thread::DEFAULT_SCHEDULE_TIME_MS);
+        CHECK(b.total_runtime_ms == DEFAULT_TIME_QUANTUM);
+        CHECK_FALSE(g_scheduler.time_quantum_past);
     }
 
     // Each tick saves the outgoing thread's live frame into its TCB and loads
@@ -364,8 +580,8 @@ namespace Tests {
         CHECK_FALSE(g_scheduler.waiting_queue.empty());
     }
 
-    // A lone sleeper holds the head every tick, so its countdown advances once
-    // per tick and it is released on exactly the nth one.
+    // A countdown advances once per tick and the thread is released on exactly
+    // the nth one -- and leaves the waiting queue when it goes.
     TEST_CASE("PIT ticks wake a sleeper once its countdown runs out", "[scheduler]") {
         SchedFixture fixture {};
         Process::ProcessBlock kproc {};
@@ -389,10 +605,9 @@ namespace Tests {
         CHECK(g_scheduler.waiting_queue.empty());
     }
 
-    // Only the thread at the head counts down, so sleepers are released
-    // strictly in the order they were queued -- one per tick here, since each
-    // wake-up promotes the next one to the head.
-    TEST_CASE("sleepers wake in the order they were queued", "[scheduler]") {
+    // Every tick walks the whole queue, so each sleeper runs its own timer and
+    // wakes on its own deadline -- queue position buys it nothing.
+    TEST_CASE("each sleeper counts down on its own deadline", "[scheduler]") {
         SchedFixture fixture {};
         Process::ProcessBlock kproc {};
 
@@ -403,9 +618,10 @@ namespace Tests {
 
         g_scheduler.add_ready_threads(&runner);
 
+        std::uint64_t ms = 1;
         for (auto* s : {&s0, &s1, &s2}) {
             s->state      = Thread::ThreadState::Sleep;
-            s->sleep_time = 1;
+            s->sleep_time = ms++;
             g_scheduler.waiting_queue.push_tail(s);
         }
 
@@ -413,8 +629,8 @@ namespace Tests {
 
         tick(&frame);
         CHECK(s0.state != Thread::ThreadState::Sleep);
-        CHECK(s1.state == Thread::ThreadState::Sleep);
-        CHECK(s2.state == Thread::ThreadState::Sleep);
+        CHECK(s1.sleep_time == 1);
+        CHECK(s2.sleep_time == 2);
 
         tick(&frame);
         CHECK(s1.state != Thread::ThreadState::Sleep);
@@ -425,11 +641,52 @@ namespace Tests {
         CHECK(g_scheduler.waiting_queue.empty());
     }
 
-    // A sleeper behind another does not start counting until the one ahead of
-    // it wakes, so its delay is the sum of everything queued in front. A 2ms
-    // sleep queued behind a 5ms one lands at 7ms, not 2ms -- head-only is a
-    // wake *order*, not a set of independent timers.
-    TEST_CASE("a sleeper queued behind another waits for it too", "[scheduler]") {
+    // A woken sleeper must leave waiting_queue on its way to ready_threads:
+    // ThreadBlock has exactly one list hook, so it cannot be linked into both
+    // -- pushing it onto the second silently truncates the first.
+    TEST_CASE("a woken sleeper moves between the queues, it is not copied", "[scheduler]") {
+        SchedFixture fixture {};
+        Process::ProcessBlock kproc {};
+
+        Thread::ThreadBlock runner {}; runner.m_name = "runner"; runner.m_process = &kproc;
+        Thread::ThreadBlock early {}; early.m_name = "early"; early.m_process = &kproc;
+        Thread::ThreadBlock late  {}; late.m_name  = "late";  late.m_process  = &kproc;
+
+        g_scheduler.add_ready_threads(&runner);
+
+        early.state = Thread::ThreadState::Sleep; early.sleep_time = 1;
+        late.state  = Thread::ThreadState::Sleep; late.sleep_time  = 4;
+        g_scheduler.waiting_queue.push_tail(&early);
+        g_scheduler.waiting_queue.push_tail(&late);
+
+        x86::ArchIrq::IrqFrame frame {};
+        tick(&frame);
+
+        // early left the waiting queue; late is still on it and still reachable.
+        CHECK(g_scheduler.waiting_queue.size() == 1);
+        bool late_queued = false;
+        for (auto& t : g_scheduler.waiting_queue) {
+            CHECK(&t != &early);
+            if (&t == &late) late_queued = true;
+        }
+        CHECK(late_queued);
+
+        bool early_ready = false;
+        for (auto& t : g_scheduler.ready_threads) {
+            if (&t == &early) early_ready = true;
+        }
+        CHECK(early_ready);
+
+        // late's timer survived the surgery on the list in front of it.
+        tick_for_ms(&frame, 3);
+        CHECK(late.state != Thread::ThreadState::Sleep);
+        CHECK(g_scheduler.waiting_queue.empty());
+    }
+
+    // A short sleep queued behind a long one still lands on time: 2ms behind a
+    // 5ms sleep wakes at 2ms, out of queue order, because the two countdowns
+    // are independent timers rather than a wake *order*.
+    TEST_CASE("a short sleeper queued behind a long one wakes first", "[scheduler]") {
         SchedFixture fixture {};
         Process::ProcessBlock kproc {};
 
@@ -446,26 +703,21 @@ namespace Tests {
 
         x86::ArchIrq::IrqFrame frame {};
 
-        tick_for_ms(&frame, 4);
-        CHECK(slow.state == Thread::ThreadState::Sleep);
-        CHECK(slow.sleep_time == 1);
-        // fast held the tail the whole time, so nothing was taken off it.
-        CHECK(fast.sleep_time == 2);
-
-        tick(&frame);                                      // slow's 5th tick
-        CHECK(slow.state != Thread::ThreadState::Sleep);
-        CHECK(fast.state == Thread::ThreadState::Sleep);
-
-        // Only now does fast reach the head and begin counting.
-        tick_for_ms(&frame, 2);
+        tick_for_ms(&frame, 2);                            // fast's deadline
         CHECK(fast.state != Thread::ThreadState::Sleep);
+        // slow was ticked over the same two ticks, from the head.
+        CHECK(slow.state == Thread::ThreadState::Sleep);
+        CHECK(slow.sleep_time == 3);
+
+        tick_for_ms(&frame, 3);                            // slow's 5th tick
+        CHECK(slow.state != Thread::ThreadState::Sleep);
         CHECK(g_scheduler.waiting_queue.empty());
     }
 
-    // A tick spent on the countdown ends there -- it never reaches the
-    // round-robin path, so neither the runtime charge nor the slice check
-    // happens while a sleeper holds the head.
-    TEST_CASE("a countdown tick does not rotate the cpu", "[scheduler]") {
+    // The countdown is drained on the way through the handler, not instead of
+    // it: the same tick still charges the running thread and still checks its
+    // slice, so the cpu keeps rotating while threads sleep.
+    TEST_CASE("a countdown tick still rotates the cpu", "[scheduler]") {
         SchedFixture fixture {};
         Process::ProcessBlock kproc {};
 
@@ -485,24 +737,25 @@ namespace Tests {
         x86::ArchIrq::IrqFrame frame {};
         tick_for_ms(&frame, Thread::DEFAULT_SCHEDULE_TIME_MS + 2);
 
-        // Well past a's slice, but every one of those ticks went to the
-        // countdown instead.
-        CHECK(g_scheduler.curr_thread == &a);
-        CHECK(a.total_runtime_ms == 0);
+        // a's slice expired on tick 6 and b took over, while the sleeper's
+        // countdown was drained by all 8 of those ticks.
+        CHECK(g_scheduler.curr_thread == &b);
+        CHECK(a.total_runtime_ms == Thread::DEFAULT_SCHEDULE_TIME_MS);
+        CHECK(b.total_runtime_ms == 2);
+        CHECK(sleeper.state == Thread::ThreadState::Sleep);
         CHECK(sleeper.sleep_time == Thread::DEFAULT_SCHEDULE_TIME_MS - 2);
 
-        // Once the queue drains, the very next tick reaches the slice check --
-        // a's delta has been accumulating the whole time -- and b takes over.
+        // The remaining ticks retire the countdown and hand the sleeper to the
+        // ready queue rather than leaving it on the waiting queue.
         tick_for_ms(&frame, Thread::DEFAULT_SCHEDULE_TIME_MS - 2);
-        REQUIRE(g_scheduler.waiting_queue.empty());
-        tick(&frame);
-        CHECK(g_scheduler.curr_thread == &b);
+        CHECK(sleeper.state == Thread::ThreadState::Ready);
+        CHECK(g_scheduler.waiting_queue.empty());
     }
 
     // Blocked threads share the waiting queue but carry no countdown --
     // sleep_time is 0 for them, which the drain would read as "expired". The
-    // head check goes by state, so a blocked thread at the head is left where
-    // it is and the tick falls through to the round-robin path instead.
+    // drain filters on state, so they are stepped over and stay queued until
+    // whatever they are waiting on calls unblock().
     TEST_CASE("the sleep drain leaves blocked threads queued", "[scheduler]") {
         SchedFixture fixture {};
         Process::ProcessBlock kproc {};
@@ -542,10 +795,10 @@ namespace Tests {
         pb.add_thread(&tb);                 // tb.m_process = &pb
 
         REQUIRE(ta.m_process == &pa && tb.m_process == &pb);
-        REQUIRE(pa.vaddr.pml4_pa != pb.vaddr.pml4_pa);
+        REQUIRE(pa.address_space.page_dir.pml4_pa != pb.address_space.page_dir.pml4_pa);
 
         g_scheduler.add_ready_threads(&ta);   // curr = ta, CR3 <- process A
-        CHECK((Memory::Vmm::read_cr3() & ~0xFFFull) == (pa.vaddr.pml4_pa & ~0xFFFull));
+        CHECK((Memory::Vmm::read_cr3() & ~0xFFFull) == (pa.address_space.page_dir.pml4_pa & ~0xFFFull));
         g_scheduler.add_ready_threads(&tb);
 
         g_scheduler.schedule();
@@ -554,12 +807,12 @@ namespace Tests {
         // Cross into process B: CR3 must follow the address space.
         g_scheduler.schedule();
         CHECK(g_scheduler.curr_thread == &tb);
-        CHECK((Memory::Vmm::read_cr3() & ~0xFFFull) == (pb.vaddr.pml4_pa & ~0xFFFull));
+        CHECK((Memory::Vmm::read_cr3() & ~0xFFFull) == (pb.address_space.page_dir.pml4_pa & ~0xFFFull));
 
         // Cross back into process A: CR3 swings back.
         g_scheduler.schedule();
         CHECK(g_scheduler.curr_thread == &ta);
-        CHECK((Memory::Vmm::read_cr3() & ~0xFFFull) == (pa.vaddr.pml4_pa & ~0xFFFull));
+        CHECK((Memory::Vmm::read_cr3() & ~0xFFFull) == (pa.address_space.page_dir.pml4_pa & ~0xFFFull));
     }
 
     // Every tick reschedules, so the CPU rotates between process A and
@@ -591,7 +844,7 @@ namespace Tests {
                 saw_process_b = true;
             }
             const auto live   = Memory::Vmm::read_cr3() & ~0xFFFull;
-            const auto wanted = g_scheduler.curr_thread->m_process->vaddr.pml4_pa & ~0xFFFull;
+            const auto wanted = g_scheduler.curr_thread->m_process->address_space.page_dir.pml4_pa & ~0xFFFull;
             if (live != wanted) {
                 cr3_tracks_process = false;
             }

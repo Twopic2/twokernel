@@ -10,6 +10,7 @@
 #include <boot/boot.hpp>
 #include <limine/requests.hpp>
 #include <util/kernel_logger.hpp>
+#include <util/terminal.hpp>
 #include <drivers/fbtty.hpp>
 #include <drivers/framebuffer.hpp>
 #include <arch/x86-64/arch/cpu.hpp>
@@ -66,6 +67,7 @@ extern "C" void kmain() {
 
     //KTest::run("[keyboard]");
     //KTest::run("[irq]");
+    //KTest::run("[spinlock]");
     //KTest::run("[ringbuffer]");
 
     // KTest::run("[elf]"); 
@@ -75,6 +77,10 @@ extern "C" void kmain() {
     auto* user_thread = x86::Proc::Thread::ThreadBlock {"init_thread", &init_proc, }; */
 
 
-    // Once we finish we halt
-    CxxRuntime::hcf();
+    Cpu::cli();
+    Util::Terminal::start();
+
+    for (;;) {
+        asm volatile("sti; hlt" ::: "memory");
+    }
 }

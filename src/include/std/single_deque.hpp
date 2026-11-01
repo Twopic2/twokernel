@@ -142,6 +142,10 @@ namespace kstd {
             }
 
             constexpr void remove(T* value) {
+                if (!value || !head) {
+                    return;
+                }
+
                 if (value == tail) {
                     pop_tail();
                     return;
@@ -150,9 +154,14 @@ namespace kstd {
                     return;
                 }
 
+                // Callers may hand us a value that was never linked here, so stop
+                // at the end of the list instead of walking off it.
                 auto prev_value = head;
                 while ((prev_value->*Hook).next != value) {
                     prev_value = static_cast<T*>((prev_value->*Hook).next);
+                    if (!prev_value) {
+                        return;
+                    }
                 }
 
                 (prev_value->*Hook).next = (value->*Hook).next;

@@ -52,9 +52,10 @@ https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
 - [?] Initial syscall set (write, exit, getpid, mmap, brk)
     ### 06 - Impl userspace memory
         - [x] Kernel heap (`kmalloc`/`kfree`, slab or bump-then-free-list on top of PMM)
-        - [ ] Set up proper vaddr class for user process 
-        - [ ] Set up where user threads points to the user vaddr rather than kernel
-- [ ] `unmap` should also free intermediate page tables when empty + INVLPG / TLB shootdown
+        - [?] Set up proper vaddr class for user process 
+        - [?] Makes it so that process has an allocate function 
+        - [?] Set up regions for where the start/end of the VM region are
+        - [?] Set up where user threads points to the user vaddr rather than kernel
 - [ ] Replace PIC with APIC + LAPIC timer (or HPET) — needed for preemptive scheduling
 - [ ] ACPI table parsing (RSDP/MADT) — feeds APIC/SMP
 - [ ] PS/2 keyboard or serial input for interactive debugging

@@ -121,6 +121,8 @@ set(KERNEL_SOURCES
     src/kernel/drivers/framebuffer.cpp
     src/kernel/drivers/fbtty.cpp
     src/kernel/util/kernel_logger.cpp
+    src/kernel/util/terminal.cpp
+    src/kernel/util/terminal_support.cpp
     src/kernel/arch/x86-64/arch.cpp
     src/kernel/arch/x86-64/system/gdt.cpp
     src/kernel/arch/x86-64/system/gdt.s
@@ -136,6 +138,7 @@ set(KERNEL_SOURCES
     src/kernel/memory/vmm.cpp
     src/kernel/tests/pmm_tests.cpp
     src/kernel/tests/vmm_tests.cpp
+    src/kernel/tests/heap_tests.cpp
     src/kernel/tests/irq_tests.cpp
     src/kernel/tests/schedule_tests.cpp
     src/kernel/tests/deque_tests.cpp
@@ -143,10 +146,17 @@ set(KERNEL_SOURCES
     src/kernel/tests/keyboard_irq_tests.cpp
     src/kernel/tests/elf_tests.cpp
     src/kernel/tests/syscall_tests.cpp
+    src/kernel/tests/spinlock_tests.cpp
     src/kernel/arch/x86-64/dev/keyboard.cpp
     src/kernel/drivers/pit.cpp
     src/kernel/drivers/ps2.cpp
 )
+
+# This suite currently calls the unimplemented user heap allocator.
+option(TWOKERNEL_BUILD_USER_MEMORY_TESTS "Build unfinished user-memory tests" OFF)
+if(TWOKERNEL_BUILD_USER_MEMORY_TESTS)
+    list(APPEND KERNEL_SOURCES src/kernel/tests/user_memory_tests.cpp)
+endif()
 
 set(FLANTERM_SOURCES
     ${FLANTERM_DIR}/src/flanterm.c
@@ -167,7 +177,10 @@ add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCE
     src/include/sys/syscalls.hpp
     src/kernel/sys/syscalls.cpp
     src/kernel/arch/x86-64/arch/syscall.s
-    src/include/arch/x86-64/arch/arch_syscalls.hpp)
+    src/include/arch/x86-64/arch/arch_syscalls.hpp
+    src/include/memory/address_space.hpp
+    src/kernel/memory/address_space.cpp
+    src/kernel/memory/heap.cpp)
 
 if(CMAKE_HOST_APPLE)
     target_compile_definitions(twokernel.elf PRIVATE TWOKERNEL_HOST_MACOS)

@@ -22,15 +22,14 @@
     ? Waiting time — total time spent in the ready queue (not running, not blocked):
     ? Waiting Time = Turnaround Time - Burst Time
 
-    Example
-    A=25ms, B=10ms, C=20ms, all arrive t=0, quantum=10ms
-    t=0  → 10:  A runs  (A remaining: 15)
-    t=10 → 20:  B runs  (B remaining: 0) → B done at t=20
-    t=20 → 30:  C runs  (C remaining: 10)
-    t=30 → 40:  A runs  (A remaining: 5)
-    t=40 → 50:  C runs  (C remaining: 0) → C done at t=50
-    t=50 → 55:  A runs  (A remaining: 0) → A done at t=55
- */
+    * Linux 3.9 man pages states that the default time quantum is around 100
+
+    * 10-9-2026 update
+    * So I decided that the default time allocated to each thread is around 4-6ms
+    * But at runtime we can decide how long the task will run, each time it context switches it resets backs to default
+    * Listed above is what linux has its time quantum as and if it goes over that we don't 
+*/
+
 
 namespace x86::Proc::Scheduler {
     void Schedule::lock_scheduler() {
@@ -56,11 +55,11 @@ namespace x86::Proc::Scheduler {
     }
 
     void Schedule::add_ready_threads(Thread::ThreadBlock* thread) {
-        if (ready_threads.empty()) {
+        if (ready_threads.empty() && !curr_thread) {
             ready_threads.push_head(thread);
             System::Gdt::tss.rsp0 = reinterpret_cast<std::uint64_t>(thread->rsp0);
             Cpu::bsp_cpu.syscall_kernel_rsp = System::Gdt::tss.rsp0; // ! syscall.S reads this, not the TSS
-            Memory::Vmm::load_cr3(thread->m_process->vaddr.pml4_pa);
+            Memory::Vmm::load_cr3(thread->m_process->address_space.page_dir.pml4_pa);
             
             curr_thread = thread;
             curr_thread->exec_start_ms = Drivers::Pit::get_time_milliseconds();
@@ -68,7 +67,15 @@ namespace x86::Proc::Scheduler {
             return;
         }
 
+        if (time_quantum_past) {
+            thread->state = Thread::ThreadState::Ready;
+            ready_threads.push_tail(thread);
+            time_quantum_past = false;
+            return;
+        } 
+
         thread->state = Thread::ThreadState::Ready;
+        thread->reset_scheduled_time();
         ready_threads.push_tail(thread);
     }
 
@@ -80,46 +87,32 @@ namespace x86::Proc::Scheduler {
         lock_scheduler();
         curr_thread->registers = *frame;
 
-        // TODO This is a massive problem MUSTFIX
-        if (!waiting_queue.empty()) {
-            auto* sleep_thread = waiting_queue.pop_head();
-
-            if (sleep_thread->state == Thread::ThreadState::Blocked) {
-                waiting_queue.push_head(sleep_thread);
-                
-                unlock_scheduler();
-                *frame = curr_thread->registers;
-
-                return;
+        curr_thread->total_runtime_ms += 1;
+        for (auto& sleep_thread : waiting_queue) {
+            if (sleep_thread.state == Thread::ThreadState::Blocked) {
+                continue;
             }
 
-            if (sleep_thread->sleep_time > 0) {
-                --sleep_thread->sleep_time;
-            } 
+            if (sleep_thread.sleep_time > 0) {
+                sleep_thread.sleep_time -= 1;
+            }
 
-            if (sleep_thread->sleep_time != 0) {
-                waiting_queue.push_head(sleep_thread);
-            } else {
-                unblock(sleep_thread);
-            } 
-
-            unlock_scheduler();
-            *frame = curr_thread->registers;
-
-            return;
+            if (sleep_thread.sleep_time == 0) {
+                unblock(&sleep_thread);
+            }
         }
-        
+
         auto now = Drivers::Pit::get_time_milliseconds();
         auto delta = now - curr_thread->exec_start_ms;
-      
-        curr_thread->total_runtime_ms += 1;
 
         if (delta >= curr_thread->scheduled_time) {
+            Schedule::schedule();
+        } else if (delta == DEFAULT_TIME_QUANTUM) {
+            time_quantum_past = true;
             Schedule::schedule();
         }
 
         unlock_scheduler();
-
         *frame = curr_thread->registers;
     }
 
@@ -134,6 +127,14 @@ namespace x86::Proc::Scheduler {
             return;
         }
 
+        if (time_quantum_past) {
+            get_current_thread()->scheduled_time = get_current_thread()->scheduled_time - DEFAULT_TIME_QUANTUM;
+            
+            if (get_current_thread()->scheduled_time == 0) {
+                get_current_thread()->reset_scheduled_time();
+            }
+        }
+
         auto next_thread = ready_threads.pop_head();
         next_thread->state = Thread::ThreadState::Running;
 
@@ -141,21 +142,9 @@ namespace x86::Proc::Scheduler {
     }
 
     void Schedule::switch_task(Thread::ThreadBlock* next_thread) {
-        //Util::dump_registers("current thread before context switch", curr_thread->registers); 
-        if (curr_thread->m_process->is_dead && !next_thread->m_process->is_dead) {
-            Memory::Vmm::load_cr3(next_thread->m_process->vaddr.pml4_pa);
-            curr_thread = next_thread;
-            curr_thread->exec_start_ms = Drivers::Pit::get_time_milliseconds();
-            return;
-        } 
-        
         if (curr_thread->state == Thread::ThreadState::Running && curr_thread != idle_thread) { 
             Schedule::add_ready_threads(curr_thread);
-        }
-
-        if (next_thread->m_process->is_dead) {
-            schedule();
-            return;
+            next_thread->state = Thread::ThreadState::Running;
         }
 
         if (next_thread == idle_thread) {
@@ -168,12 +157,11 @@ namespace x86::Proc::Scheduler {
         Cpu::bsp_cpu.syscall_kernel_rsp = System::Gdt::tss.rsp0; // ! syscall.S reads this, not the TSS
 
         if (next_thread->m_process != curr_thread->m_process) {
-            Memory::Vmm::load_cr3(next_thread->m_process->vaddr.pml4_pa);
+            Memory::Vmm::load_cr3(next_thread->m_process->address_space.page_dir.pml4_pa);
         }
 
         curr_thread = next_thread;
         curr_thread->exec_start_ms = Drivers::Pit::get_time_milliseconds();
-      //  Util::dump_registers("next thread after context switch", next_thread.registers);
     }
 
     void Schedule::sleep(std::uint64_t milli) {
@@ -192,7 +180,7 @@ namespace x86::Proc::Scheduler {
         lock_scheduler();
 
         curr_thread->state = Thread::ThreadState::Ready;
-        curr_thread->reset();
+        curr_thread->reset_scheduled_time();
         ready_threads.push_tail(curr_thread);
 
         Schedule::schedule();
@@ -210,20 +198,19 @@ namespace x86::Proc::Scheduler {
         unlock_scheduler();
     }
 
-    Thread::ThreadBlock* Schedule::get_current_thread() {
-        Util::IrqGaurd irq_gaurd {};
-        return curr_thread;
-    }
-
     void Schedule::unblock(Thread::ThreadBlock* task) {
         lock_scheduler();
 
-        if (ready_threads.empty()) {
+        waiting_queue.remove(task);
+        task->sleep_time = 0;
+        task->state = Thread::ThreadState::Ready;
+
+        if (ready_threads.empty() && curr_thread == idle_thread) {
             Schedule::switch_task(task);
+        } else {
+            ready_threads.push_tail(task);
         }
 
-        task->state = Thread::ThreadState::Ready;
-        ready_threads.push_tail(task);
         unlock_scheduler();
     }
 }

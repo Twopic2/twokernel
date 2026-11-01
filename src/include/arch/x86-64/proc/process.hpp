@@ -2,6 +2,7 @@
 
 #include "arch/x86-64/arch/arch_irq.hpp"
 #include "memory/vmm.hpp"
+#include "memory/address_space.hpp"
 #include "std/single_deque.hpp"
 #include <arch/x86-64/proc/thread.hpp>
 #include <cstdint>
@@ -18,6 +19,12 @@ to things like file handles. All of this information is stored in a process cont
 
 // TODO Right now there is something wrong with page faults when it comes to process. 
 //* I'm going to try and get some better PF errors
+
+
+/* 
+    ! User stack memory
+    The top should be at 0x00007FFFFFFFF000 and it should only be around 1mb. 
+*/
 
 namespace x86::Proc::Process {
     enum class ProcStats : std::uint8_t {
@@ -38,11 +45,16 @@ namespace x86::Proc::Process {
         kstd::SingleDeque<Thread::ThreadBlock, &Thread::ThreadBlock::proc_hook> threads;
         Thread::ThreadBlock* curr_thread {}; 
         ProcessBlock* parent {};
-        Memory::Vmm::VAddressSpace vaddr;
+        Memory::AddrSpace::AddressSpace address_space;
         
         ProcStats status; 
         bool is_user;
+        bool is_zombie;
         bool is_dead;
+        bool is_orphaned;
+
+        int exit_status;
+
         std::string_view m_name;
         std::uint16_t pid;
         std::uint8_t thread_size {};
@@ -54,10 +66,13 @@ namespace x86::Proc::Process {
         void add_thread(Thread::ThreadBlock* thread);
         void remove_thread(Thread::ThreadBlock* thread);        
 
+        //void allocate();
+
         void exit(int stats = 0);
         
+        // ! Use carefully 
         inline void remove_all_threads() {
-            Util::IrqGaurd irq {};
+            Util::IrqRAIGaurd irq {};
             threads.clear_all();    
         }
     };

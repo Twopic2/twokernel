@@ -80,9 +80,15 @@ namespace Exe::Elf {
             return std::unexpected(ElfLoadError::Invalid);
         }
 
+        if (ehdr->e_phentsize < sizeof(Elf64_Phdr) ||
+            ehdr->e_phoff + static_cast<std::uint64_t>(ehdr->e_phnum) * ehdr->e_phentsize > size) {
+            return std::unexpected(ElfLoadError::Invalid);
+        }
+
         std::uint64_t image_base {};
         bool base_found = false;
         std::uint64_t image_end {};
+        std::uint64_t prev_page_end {};
         auto* bytes = reinterpret_cast<std::uint8_t*>(data);
 
         for (std::size_t i = 0; i < ehdr->e_phnum; i++) {
@@ -92,6 +98,27 @@ namespace Exe::Elf {
                 continue;
             }
 
+            if (phdr->p_filesz > phdr->p_memsz) {
+                return std::unexpected(ElfLoadError::Invalid);
+            }
+
+            if (phdr->p_offset > size || phdr->p_filesz > size - phdr->p_offset) {
+                return std::unexpected(ElfLoadError::Invalid);
+            }
+
+            if (phdr->p_vaddr < Memory::Vmm::PAGE_SIZE ||
+                phdr->p_memsz > Memory::Vmm::USER_ADDR_END - phdr->p_vaddr) {
+                return std::unexpected(ElfLoadError::Invalid);
+            }
+
+            const std::uint64_t page_start = Util::Align::align_down(phdr->p_vaddr, Memory::Vmm::PAGE_SIZE);
+            const std::uint64_t page_end = Util::Align::align_up(phdr->p_vaddr + phdr->p_memsz, Memory::Vmm::PAGE_SIZE);
+
+            if (base_found && page_start < prev_page_end) {
+                return std::unexpected(ElfLoadError::Invalid);
+            }
+            prev_page_end = page_end;
+
             if (!base_found) {
                 image_base = phdr->p_vaddr;
                 base_found = true;
@@ -100,6 +127,10 @@ namespace Exe::Elf {
             if (phdr->p_vaddr + phdr->p_memsz > image_end) {
                 image_end = phdr->p_vaddr + phdr->p_memsz;
             }
+        }
+
+        if (!base_found || ehdr->e_entry < image_base || ehdr->e_entry >= image_end) {
+            return std::unexpected(ElfLoadError::Invalid);
         }
 
         for (std::size_t i = 0; i < ehdr->e_phnum; i++) {
@@ -129,9 +160,13 @@ namespace Exe::Elf {
             const std::uint64_t pages = aligned_size / Memory::Vmm::PAGE_SIZE;
 
             auto pa = Memory::Pmm::alloc(pages);
+            if (pa == 0) {
+                // TODO: unmap and free the segments already loaded
+                return std::unexpected(ElfLoadError::NoMemory);
+            }
 
             // TODO: Add a proper mmap() syscall
-            Memory::Vmm::map(*space->vaddr.pml4, pa, aligned_base, aligned_size, flags);
+            Memory::Vmm::map(*space->address_space.page_dir.pml4, pa, aligned_base, aligned_size, flags);
             auto* dst = reinterpret_cast<std::uint8_t*>(pa + Limine::get_hhdm());
 
             LibC::memset(dst, 0, aligned_size);

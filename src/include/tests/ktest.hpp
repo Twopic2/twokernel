@@ -117,7 +117,19 @@ namespace KTest {
         }
     };
 
-    inline void run(const char* tag_filter = nullptr) {
+    inline void list(const char* tag_filter = nullptr) {
+        int count = 0;
+        for (const TestCase* tc = first_test; tc != nullptr; tc = tc->next) {
+            if (!contains(tc->tags, tag_filter)) {
+                continue;
+            }
+            Util::klog("%s %s\n", tc->tags, tc->name);
+            ++count;
+        }
+        Util::klog("%d matching test cases\n", count);
+    }
+
+    inline void run(const char* tag_filter = nullptr, bool verbose = false) {
         assert_passed = 0;
         assert_failed = 0;
 
@@ -138,7 +150,15 @@ namespace KTest {
             current_failed  = false;
             header_printed  = false;
 
+            if (verbose) {
+                Util::klog("[RUN] %s %s\n", tc->tags, tc->name);
+            }
+
             tc->fn();
+
+            if (verbose) {
+                Util::klog("[%s] %s\n", current_failed ? "FAIL" : "PASS", tc->name);
+            }
 
             if (current_failed) {
                 cases_failed++;
@@ -148,7 +168,9 @@ namespace KTest {
         }
 
         Util::klog("===============================================================================\n");
-        if (cases_failed == 0) {
+        if (cases_passed + cases_failed == 0) {
+            Util::klog("No test cases matched the filter.\n");
+        } else if (cases_failed == 0) {
             Util::klog("All tests passed (%d assertions in %d test cases)\n",
                        assert_passed, cases_passed);
         } else {

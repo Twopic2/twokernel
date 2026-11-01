@@ -63,6 +63,9 @@ namespace x86::System::Idt {
         std::uint64_t pg_address;
         asm volatile("mov %%cr2, %0" : "=r" (pg_address));
 
+        // ! NOTE
+        // * Need to include demand paging when we get to user memory or try to map the page fault;
+    
         /* const bool present = frame->error & (1 << 0);
         if (!present) {
             auto curr_thread = Proc::Scheduler::g_scheduler.get_current_thread();

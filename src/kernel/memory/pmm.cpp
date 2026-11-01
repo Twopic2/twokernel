@@ -8,6 +8,8 @@
 
 namespace Memory::Pmm {
     std::uint64_t alloc(std::uint64_t count) {
+        g_pmm_irq_lock.acquire();
+
         FreeList* prev = nullptr;
         FreeList* curr = freelist_head;
 
@@ -27,19 +29,33 @@ namespace Memory::Pmm {
                     
                     push_list(phys_offset, page_offset);
                 }
+                
+                g_ref_alloc += 1;
 
+                g_pmm_irq_lock.release();
                 return curr->pa;
             }
 
             prev = curr;
             curr = curr->next;
         }
-
+        
+        g_pmm_irq_lock.release();
         return 0;
     }
 
     void free(std::uint64_t phys_mem, std::uint64_t count) {
+        g_pmm_irq_lock.acquire();
+
+        if (g_ref_alloc == 0) {
+            g_pmm_irq_lock.release();
+            return;
+        }
+
         push_list(phys_mem, count);
+        g_ref_alloc -= 1;
+
+        g_pmm_irq_lock.release();
     }
 
     void init_pmm() {

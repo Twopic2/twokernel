@@ -12,4 +12,13 @@ namespace Syscalls {
 
         *frame->ret() = global_syscall[syscall_num](frame);
     }
+
+    // TODO: stubs until user memory mapping lands
+    auto write(x86::Syscalls::SyscallFrame*) -> std::uint64_t {
+        return 0;
+    }
+
+    auto brk(x86::Syscalls::SyscallFrame*) -> std::uint64_t {
+        return 0;
+    }
 }

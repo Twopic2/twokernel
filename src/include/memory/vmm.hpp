@@ -10,9 +10,6 @@
 
 /// NOTES:
 /*
-
-
-
 Level 4 paging 
 PML4 -> PDP -> PD -> PT
 
@@ -49,7 +46,6 @@ namespace Memory::Vmm {
 
     inline constexpr std::size_t PAGE_SIZE = 0x1000;
 
-    inline constexpr std::uint64_t USER_STACK_TOP = 0x7FFFFFFFF000;
     inline constexpr std::uint64_t USER_ADDR_END = 0x0000800000000000;
 
     // Direct Map way since its way easier 
@@ -63,17 +59,9 @@ namespace Memory::Vmm {
 
         https://github.com/SerenityOS/serenity/blob/master/Kernel/Memory/VirtualAddress.h
     */
-    struct VAddressSpace {
+    struct PageDirectory {
         struct PageMap* pml4;
         std::uint64_t pml4_pa;
-
-        auto operator<=>(const VAddressSpace& other) const {
-            return pml4_pa <=> other.pml4_pa;
-        }
-
-        auto operator==(const VAddressSpace& other) const {
-            return pml4_pa == other.pml4_pa;
-        }
 
         [[nodiscard]] std::uint8_t* as_ptr() {
             auto ptr = reinterpret_cast<std::uint8_t*>(pml4_pa);
@@ -81,7 +69,7 @@ namespace Memory::Vmm {
         }
     }; 
     
-    inline struct VAddressSpace g_kernel_space;
+    inline struct PageDirectory g_kernel_page_directory;
 
     // Credit to RaidtheWeb
     static inline void flush_tlb() {
@@ -101,36 +89,36 @@ namespace Memory::Vmm {
         return vaddr;
     }
 
-    inline VAddressSpace new_pagemap() {
+    inline PageDirectory new_pagemap() {
         std::uint64_t pa = Pmm::alloc(1);
         if (pa == 0) {
             Util::klog_panic("Pmm::alloc(1) failed in new_pagemap() -- out of physical memory\n");
-            return VAddressSpace {0, 0};
+            return PageDirectory {0, 0};
         }
 
         PageMap* pml4 = reinterpret_cast<PageMap*>(pa + Limine::hhdm.response->offset);
         LibC::memset(pml4->entries.data(), 0, sizeof(pml4->entries));
 
-        return VAddressSpace{ .pml4 = pml4, .pml4_pa = pa };
+        return PageDirectory{ .pml4 = pml4, .pml4_pa = pa };
     }
 
-    void free_pagemap(struct VAddressSpace& space);
-    void free_table(PageMap& table, std::size_t level = 4, std::size_t count = 512);
+    void free_pagemap(struct PageDirectory& space);
+    void free_table(PageMap& table, std::size_t level = 4);
 
     PageMap* get_next_level(struct PageMap& entry, std::size_t index, std::uint64_t flags, bool allocates);
 
-    void fill_kernel_entries(struct VAddressSpace& vaddr);
+    void fill_kernel_entries(struct PageDirectory& vaddr);
+    void fill_user_entries(struct PageDirectory& vaddr);
+
     void reclaim_bootloader_ranges();
     void map_limine_kernel_addr(std::uint64_t start, std::uint64_t end, std::uint64_t flags);
     void map(struct PageMap& pagemap, std::uint64_t pa, std::uint64_t va, std::size_t length, std::uint64_t flags);
     /* PageMap no longer points to pa */
     void unmap(struct PageMap& pagemap, std::uint64_t va, std::size_t length);
 
-    std::uint64_t va_to_pa(struct VAddressSpace& space, std::uint64_t va);
-    void process_fill_kernel_entries(struct VAddressSpace& vaddr);
-   
-    std::uint8_t* kmalloc(std::size_t pages);
-    void kfree(std::uint8_t* va);
-
+    std::uint64_t va_to_pa(struct PageDirectory& space, std::uint64_t va);
+    void process_fill_kernel_entries(struct PageDirectory& vaddr);
+    void process_fill_user_entires(struct PageDirectory& page_directory);
+    
     void init();
 }

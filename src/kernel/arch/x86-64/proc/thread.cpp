@@ -9,7 +9,7 @@
 #include <cstdint>
 
 namespace x86::Proc::Thread {
-    ThreadBlock::ThreadBlock(std::string_view name, Process::ProcessBlock* process, FuncPtr entry, void* _) // TODO: add args
+    ThreadBlock::ThreadBlock(std::string_view name, Process::ProcessBlock* process, FuncPtr entry, void* args)
     : m_name(name), m_entry(entry), m_process(process) {
         init_kernel_stack();
 
@@ -22,13 +22,17 @@ namespace x86::Proc::Thread {
         } else {
             registers.cs = System::Idt::KERNEL_CODE;
             registers.ss = System::Idt::KERNEL_DATA;
+            // iret enters the function directly: reserve its return-address slot.
+            registers.rsp -= sizeof(std::uint64_t);
+            *reinterpret_cast<std::uint64_t*>(registers.rsp) = 0;
         }
             
         registers.rflags = SET_RFLAGS;
         registers.rip = reinterpret_cast<std::uint64_t>(entry);
+        registers.rdi = reinterpret_cast<std::uintptr_t>(args);
 
-        total_tid++;
-        thread_id = total_tid;
+        g_total_tid++;
+        thread_id = g_total_tid;
     }
 
     /* Default kernel thread */
@@ -41,12 +45,12 @@ namespace x86::Proc::Thread {
         registers.ss = System::Idt::KERNEL_DATA;
         registers.rflags = SET_RFLAGS;
 
-        total_tid++;
-        thread_id = total_tid;
+        g_total_tid++;
+        thread_id = g_total_tid;
     }    
 
     void ThreadBlock::init_kernel_stack() {
-       Util::IrqGaurd irq_gaurd {};
+       Util::IrqRAIGaurd irq_gaurd {};
         
         kernel_pa = Memory::Pmm::alloc(4);
         if (kernel_pa == 0) {
@@ -59,19 +63,18 @@ namespace x86::Proc::Thread {
         rsp0 = reinterpret_cast<std::uint64_t*>(top);
 
         registers.rsp = reinterpret_cast<std::uint64_t>(rsp0);
-    }
-
-    void ThreadBlock::init_user_stack() {
-        
-    }
+    } 
 
     void ThreadBlock::exit() {
-        Util::IrqGaurd irq {};
-        state = ThreadState::Zombie;
+        Util::IrqRAIGaurd irq {};
         Memory::Pmm::free(kernel_pa, 4);
     }
 
-    void ThreadBlock::reset() {
+    void ThreadBlock::reset_scheduled_time() {
         scheduled_time = DEFAULT_SCHEDULE_TIME_MS;
+    }
+        
+    void ThreadBlock::update_scheduled_time(std::uint64_t ms) {
+        scheduled_time = ms; 
     }
 }
