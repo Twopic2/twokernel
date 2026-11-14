@@ -3,3 +3,4 @@
 /.cache/
 .clangd
 /dependencies/
+__pycache__/

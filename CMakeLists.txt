@@ -116,13 +116,17 @@ add_custom_target(user_init ALL DEPENDS ${USER_INIT_ELF})
 
 set(KERNEL_SOURCES
     src/kmain.cpp
+    src/stats/memory.cpp
+    src/stats/scheduler.cpp
+    src/stats/trace.cpp
+    src/stats/trace_scope.cpp
     src/kernel/boot/boot.cpp
     src/kernel/limine/requests.cpp
     src/kernel/drivers/framebuffer.cpp
     src/kernel/drivers/fbtty.cpp
+    src/kernel/drivers/keyboard.cpp
+    src/kernel/drivers/terminal.cpp
     src/kernel/util/kernel_logger.cpp
-    src/kernel/util/terminal.cpp
-    src/kernel/util/terminal_support.cpp
     src/kernel/arch/x86-64/arch.cpp
     src/kernel/arch/x86-64/system/gdt.cpp
     src/kernel/arch/x86-64/system/gdt.s
@@ -181,6 +185,11 @@ add_executable(twokernel.elf ${KERNEL_SOURCES} ${FLANTERM_SOURCES} ${LIBC_SOURCE
     src/include/memory/address_space.hpp
     src/kernel/memory/address_space.cpp
     src/kernel/memory/heap.cpp)
+
+option(TWOKERNEL_ENABLE_TRACE "Record memory and scheduling traces for Perfetto" OFF)
+if(TWOKERNEL_ENABLE_TRACE)
+    target_compile_definitions(twokernel.elf PRIVATE TWOKERNEL_ENABLE_TRACE)
+endif()
 
 if(CMAKE_HOST_APPLE)
     target_compile_definitions(twokernel.elf PRIVATE TWOKERNEL_HOST_MACOS)

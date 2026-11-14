@@ -10,6 +10,8 @@
 #include <cstddef>
 #include <cstdint>
 #include "util/ansi.hpp"
+#include "stats/scheduler.hpp"
+#include "stats/trace.hpp"
 
 /* 
     ? Notes: 
@@ -55,6 +57,8 @@ namespace x86::Proc::Scheduler {
     }
 
     void Schedule::add_ready_threads(Thread::ThreadBlock* thread) {
+        const auto now = Stats::Trace::timestamp_us();
+        Stats::Scheduling::ready(thread->profiling, now);
         if (ready_threads.empty() && !curr_thread) {
             ready_threads.push_head(thread);
             System::Gdt::tss.rsp0 = reinterpret_cast<std::uint64_t>(thread->rsp0);
@@ -63,6 +67,8 @@ namespace x86::Proc::Scheduler {
             
             curr_thread = thread;
             curr_thread->exec_start_ms = Drivers::Pit::get_time_milliseconds();
+            Stats::Scheduling::dispatched(thread->profiling, thread->thread_id,
+                                         thread->m_name, now);
 
             return;
         }
@@ -142,9 +148,20 @@ namespace x86::Proc::Scheduler {
     }
 
     void Schedule::switch_task(Thread::ThreadBlock* next_thread) {
+        const auto now = Stats::Trace::timestamp_us();
+        if (curr_thread != next_thread) {
+            Stats::Scheduling::stopped(curr_thread->profiling, curr_thread->thread_id, now);
+            Stats::Scheduling::dispatched(next_thread->profiling, next_thread->thread_id,
+                                         next_thread->m_name, now);
+        }
         if (curr_thread->state == Thread::ThreadState::Running && curr_thread != idle_thread) { 
             Schedule::add_ready_threads(curr_thread);
             next_thread->state = Thread::ThreadState::Running;
+        }
+
+        if (curr_thread == next_thread) {
+            // Continuing on the same thread is not a context switch or queue wait.
+            curr_thread->profiling.waiting = false;
         }
 
         if (next_thread == idle_thread) {
@@ -180,6 +197,7 @@ namespace x86::Proc::Scheduler {
         lock_scheduler();
 
         curr_thread->state = Thread::ThreadState::Ready;
+        Stats::Scheduling::ready(curr_thread->profiling, Stats::Trace::timestamp_us());
         curr_thread->reset_scheduled_time();
         ready_threads.push_tail(curr_thread);
 
@@ -204,6 +222,7 @@ namespace x86::Proc::Scheduler {
         waiting_queue.remove(task);
         task->sleep_time = 0;
         task->state = Thread::ThreadState::Ready;
+        Stats::Scheduling::ready(task->profiling, Stats::Trace::timestamp_us());
 
         if (ready_threads.empty() && curr_thread == idle_thread) {
             Schedule::switch_task(task);

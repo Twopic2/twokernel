@@ -1,6 +1,7 @@
 #pragma once
 
 #include "std/ring_buffer.hpp"
+#include "arch/x86-64/arch/event.hpp"
 #include <cstdint>
 
 /* 
@@ -22,6 +23,7 @@ namespace Drivers::Ps2 {
     enum class State : std::uint8_t {
         None,
         E0,
+        Pause,
     };
 
     inline constexpr std::uint8_t DATA_PORT = 0x60;
@@ -51,9 +53,13 @@ namespace Drivers::Ps2 {
 
         std::uint8_t last_data {};
         std::uint8_t nack_count {};
-        kstd::KeyboardBuffer data;
+        kstd::RingBuffer<Arch::KeyEvent, 255> data;
         PS2Ack signal {};
         State state_machine {};
+        std::uint8_t modifiers {};
+        std::uint8_t pause_bytes {};
+        bool caps_down {};
+        bool num_down {};
 
         void ps2_keyboard_init();
     };

@@ -18,6 +18,7 @@ using namespace Memory::Vmm;
 
 struct alignas(16) KmallocHeader {
     std::uint64_t pages;
+    std::uint64_t requested_bytes;
 };
 
 [[nodiscard]] constexpr std::size_t bytes_to_pages(std::size_t bytes) {

@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory/pmm.hpp>
+#include "stats/memory.hpp"
 
 namespace Memory::Pmm {
     std::uint64_t alloc(std::uint64_t count) {
@@ -16,7 +17,6 @@ namespace Memory::Pmm {
         while (curr) {
             if (curr->num_pages >= count) {
                 if (prev) { 
-                    // Unlinks the curr node due having too little pages
                     prev->next = curr->next;
                 } else {
                     freelist_head = curr->next;
@@ -31,6 +31,7 @@ namespace Memory::Pmm {
                 }
                 
                 g_ref_alloc += 1;
+                Stats::pmm_allocated(count);
 
                 g_pmm_irq_lock.release();
                 return curr->pa;
@@ -40,6 +41,7 @@ namespace Memory::Pmm {
             curr = curr->next;
         }
         
+        Stats::pmm_failed();
         g_pmm_irq_lock.release();
         return 0;
     }
@@ -54,6 +56,7 @@ namespace Memory::Pmm {
 
         push_list(phys_mem, count);
         g_ref_alloc -= 1;
+        Stats::pmm_freed(count);
 
         g_pmm_irq_lock.release();
     }
@@ -61,7 +64,6 @@ namespace Memory::Pmm {
     void init_pmm() {
         const auto memmaps = Limine::memmap.response->entries;
 
-        // Util::klog("Init PMM\n");
         for (std::size_t i {0}; i < Limine::memmap.response->entry_count; i++) {
             auto* entry = memmaps[i];
 
@@ -71,9 +73,9 @@ namespace Memory::Pmm {
                 std::uint64_t entry_page_amount = static_cast<uint64_t>(entry->length / Vmm::PAGE_SIZE);         
                 
                 push_list(entry->base, entry_page_amount);
+                Stats::pmm_added(entry_page_amount);
             }
         } 
-        // Util::klog("Finished mapping physical mem to virtual mem\n");
     }
 
     void push_list(std::uint64_t phys, std::uint64_t page_amount) {
@@ -89,8 +91,7 @@ namespace Memory::Pmm {
     void reclaim_bootloader(std::uint64_t memap_type, std::uintptr_t phys_mem, std::uintptr_t page_amount) {
         if (memap_type == Limine::Memmap::bootloader && memap_type && page_amount != 0) {
             push_list(phys_mem, page_amount);
+            Stats::pmm_added(page_amount);
         }
-        
-        // Util::klog("[PMM] Reclaiming bootloader memory: base=0x%llx pages=%llu\n", phys_mem, page_amount);
     }
 }

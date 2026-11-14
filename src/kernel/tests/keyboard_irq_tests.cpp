@@ -8,7 +8,7 @@ namespace Tests {
     namespace {
         // Pops and returns the oldest buffered scancode
         std::uint8_t next_code(Drivers::Ps2::Ps2Keyboard& kb) {
-            std::uint8_t code = kb.data.get_read();
+            const auto code = static_cast<std::uint8_t>(kb.data.get_read().code);
             kb.data.buf_read();
             return code;
         }
@@ -20,6 +20,9 @@ namespace Tests {
                 kb.data.buf_read();
             }
             kb.state_machine = Drivers::Ps2::State::None;
+            kb.modifiers = 0;
+            kb.caps_down = kb.num_down = false;
+            kb.pause_bytes = 0;
         }
 
         constexpr std::uint8_t code_of(Arch::ScanCode sc) {

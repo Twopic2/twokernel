@@ -3,6 +3,8 @@
 #include <limine.h>
 #include <drivers/framebuffer.hpp>
 #include <cstddef>
+#include "std/ring_buffer.hpp"
+#include "util/spinlocks.hpp"
 
 // Ansi color codes
 // https://gist.github.com/JBlond/2fea43a3049b38287e5e9cefc87b2124
@@ -35,6 +37,26 @@ namespace Drivers {
             FbTty(struct limine_framebuffer* fb);
 
             void write_terminal(const char* str, std::size_t len);
+            void dimensions(std::size_t& columns, std::size_t& rows);
+
+            // Input is nonblocking. Canonical reads expose only completed lines.
+            void receive_input(const char* bytes, std::size_t len);
+            std::size_t read_input(char* bytes, std::size_t len);
+            bool set_input_mode(bool canonical, bool echo);
+
+        private:
+            Util::IrqSpinLock lock_;
+            kstd::RingBuffer<char, 1025> input_;
+            char line_[256] {};
+            std::uint8_t widths_[256] {};
+            std::size_t line_length_ = 0;
+            bool canonical_ = true;
+            bool echo_ = true;
+
+            void write_locked(const char* bytes, std::size_t len);
+            void echo_character(char ch);
+            void erase_character();
+            bool commit_line(bool newline);
     };
 
     extern FbTty* g_tty;

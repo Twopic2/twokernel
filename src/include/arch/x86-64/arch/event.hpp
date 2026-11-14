@@ -110,6 +110,27 @@ namespace Arch {
         Delete       = 0xD3,
     };
 
+    enum KeyModifier : std::uint8_t {
+        LeftShift = 1 << 0,
+        RightShift = 1 << 1,
+        LeftCtrl = 1 << 2,
+        RightCtrl = 1 << 3,
+        LeftAlt = 1 << 4,
+        RightAlt = 1 << 5,
+        CapsLock = 1 << 6,
+        NumLock = 1 << 7,
+    };
+
+    // Modifiers are captured at key-down, before a later release can change them.
+    struct KeyEvent {
+        ScanCode code;
+        std::uint8_t modifiers;
+
+        bool shift() const { return modifiers & (LeftShift | RightShift); }
+        bool control() const { return modifiers & (LeftCtrl | RightCtrl); }
+        bool alt() const { return modifiers & (LeftAlt | RightAlt); }
+    };
+
     inline constexpr bool ps2_is_release(std::uint8_t byte) {
         return byte & 0x80;
     }

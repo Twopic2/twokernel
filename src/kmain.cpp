@@ -10,12 +10,13 @@
 #include <boot/boot.hpp>
 #include <limine/requests.hpp>
 #include <util/kernel_logger.hpp>
-#include <util/terminal.hpp>
+#include <drivers/terminal.hpp>
 #include <drivers/fbtty.hpp>
 #include <drivers/framebuffer.hpp>
 #include <arch/x86-64/arch/cpu.hpp>
 #include <arch/x86-64/arch.hpp>
 #include "util/ansi.hpp"
+#include "stats/trace.hpp"
 
 extern "C" {
 #include <flanterm.h>
@@ -78,7 +79,8 @@ extern "C" void kmain() {
 
 
     Cpu::cli();
-    Util::Terminal::start();
+    Stats::Trace::start();
+    Drivers::Terminal::start();
 
     for (;;) {
         asm volatile("sti; hlt" ::: "memory");

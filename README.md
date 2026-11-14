@@ -2,6 +2,20 @@
 
 A hobbyist monolithic kernel written in c++. Trying to be posix style.
 
+# Tooling
+
+See [Tooling.md](Tooling.md) for building, testing, debugging, and profiling.
+
+The `TwoOs>` console accepts PS/2 keyboard input with a US layout, Shift,
+Caps Lock, Num Lock, Backspace, and Tab. Enter completes a line; Ctrl+U erases
+the pending line and Ctrl+W erases the previous word. It currently displays
+and consumes lines without executing commands.
+
+The framebuffer TTY buffers completed lines for `read_input()`. Kernel readers
+can select raw input with `set_input_mode(false, false)` to receive control
+characters and VT navigation sequences without echo. Input is nonblocking;
+userspace terminal file descriptors and signal handling remain unimplemented.
+
 # Resources
 
 Limine-c++-template:
@@ -56,9 +70,7 @@ https://codeberg.org/Limine/limine-cxx-template/src/branch/trunk/limine.conf
         - [?] Makes it so that process has an allocate function 
         - [?] Set up regions for where the start/end of the VM region are
         - [?] Set up where user threads points to the user vaddr rather than kernel
-- [ ] Replace PIC with APIC + LAPIC timer (or HPET) — needed for preemptive scheduling
-- [ ] ACPI table parsing (RSDP/MADT) — feeds APIC/SMP
-- [ ] PS/2 keyboard or serial input for interactive debugging
+- [x] PS/2 keyboard input connected to the framebuffer TTY
 
 ## 07 — IPC
 - [ ] Pipes or message ports

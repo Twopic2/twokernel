@@ -10,6 +10,11 @@ namespace Drivers::Ps2 {
     }
 
     void Ps2Keyboard::on_recieve(std::uint8_t byte) {
+        // Set-1 Pause contains fake Ctrl/NumLock bytes and another E1 prefix.
+        if (state_machine == State::Pause) {
+            if (--pause_bytes == 0) state_machine = State::None;
+            return;
+        }
         switch (byte) {
             case ACK:
                 signal = PS2Ack::Ack;
@@ -28,6 +33,10 @@ namespace Drivers::Ps2 {
             case 0xE0:
                 state_machine = State::E0;
                 return;
+            case 0xE1:
+                state_machine = State::Pause;
+                pause_bytes = 5;
+                return;
         }
 
         Arch::ScanCode curr_code;
@@ -36,16 +45,44 @@ namespace Drivers::Ps2 {
                 curr_code = Arch::ps2_single_byte(byte);    
                 break;
             case State::E0:
+                // Print Screen's E0 2A / E0 AA are fake Shift transitions.
+                if ((byte & 0x7F) == 0x2A) {
+                    state_machine = State::None;
+                    return;
+                }
                 curr_code = Arch::ps2_extend_codes(byte);
                 break;
+            case State::Pause:
+                return;
         }
         state_machine = State::None;
 
-        if (Arch::ps2_is_release(byte)) {
-            return;
+        const bool released = Arch::ps2_is_release(byte);
+        std::uint8_t modifier = 0;
+        switch (curr_code) {
+            case Arch::ScanCode::LeftShift: modifier = Arch::LeftShift; break;
+            case Arch::ScanCode::RightShift: modifier = Arch::RightShift; break;
+            case Arch::ScanCode::LeftCtrl: modifier = Arch::LeftCtrl; break;
+            case Arch::ScanCode::RightCtrl: modifier = Arch::RightCtrl; break;
+            case Arch::ScanCode::LeftAlt: modifier = Arch::LeftAlt; break;
+            case Arch::ScanCode::RightAlt: modifier = Arch::RightAlt; break;
+            case Arch::ScanCode::CapsLock:
+                if (!released && !caps_down) modifiers ^= Arch::CapsLock;
+                caps_down = !released;
+                break;
+            case Arch::ScanCode::NumLock:
+                if (!released && !num_down) modifiers ^= Arch::NumLock;
+                num_down = !released;
+                break;
+            default: break;
         }
+        if (released) modifiers &= ~modifier;
+        else modifiers |= modifier;
 
-        data.buf_write(static_cast<std::uint8_t>(curr_code));
+        // Overflow must not panic in IRQ1; releases still update modifier state.
+        if (!released && byte != 0 && !data.is_full()) {
+            data.buf_write({curr_code, modifiers});
+        }
     }
 
     void Ps2Keyboard::write_cmd(std::uint8_t byte) {
