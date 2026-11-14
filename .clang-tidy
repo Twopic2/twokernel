@@ -13,8 +13,6 @@ BreakBeforeBraces: Attach
 BreakConstructorInitializers: BeforeColon
 PackConstructorInitializers: NextLine
 
-Cpp11BracedListStyle: true
-InsertNewlineAtEOF: true
 
 Checks: 'readability-identifier-naming'
 CheckOptions:

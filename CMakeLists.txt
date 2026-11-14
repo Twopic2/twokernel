@@ -81,13 +81,9 @@ set(CMAKE_ASM_FLAGS "${CROSS_FLAGS}")
 
 set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/src/kernel/arch/x86-64/linker.lds)
 
-# ── Userspace test program ────────────────────────────────────────────────────
-# Built with its own flags -- the kernel's CROSS_FLAGS (-mcmodel=kernel,
-# -mno-sse, -mno-red-zone) are wrong for a ring-3 binary. -static -fno-pie
-# keeps it ET_EXEC; elf_check_supported() rejects ET_DYN.
-# -mgeneral-regs-only: the kernel never enables SSE or saves FPU state.
-# Plain C, so there's no C++ runtime to worry about.
-# --image-base puts the ELF headers and .text together at 0x400000.
+# ── Userspace program ─────────────────────────────────────────────────────────
+# Use separate flags for the ring-3 binary. Keep it static ET_EXEC, with no
+# SSE instructions until the kernel supports saving FPU state.
 set(USER_INIT_ELF ${CMAKE_BINARY_DIR}/user_init.elf)
 set(USER_INIT_SOURCES
     ${CMAKE_SOURCE_DIR}/src/user/entry.c
@@ -106,12 +102,10 @@ add_custom_command(
             -o ${USER_INIT_ELF}
             ${USER_INIT_SOURCES}
     DEPENDS ${USER_INIT_SOURCES} ${CMAKE_SOURCE_DIR}/src/user/syscall.h
-            ${CMAKE_SOURCE_DIR}/src/user/utest.h
             ${CMAKE_SOURCE_DIR}/src/include/arch/x86-64/arch/sysv_syscalls.h
     COMMENT "Building userspace user_init.elf"
 )
-# Not linked into the kernel image -- the iso target ships it as a Limine
-# module (module_path in limine.conf) and kmain loads it as the init process.
+# Package the program as a Limine module for future userspace startup.
 add_custom_target(user_init ALL DEPENDS ${USER_INIT_ELF})
 
 set(KERNEL_SOURCES
@@ -155,12 +149,6 @@ set(KERNEL_SOURCES
     src/kernel/drivers/pit.cpp
     src/kernel/drivers/ps2.cpp
 )
-
-# This suite currently calls the unimplemented user heap allocator.
-option(TWOKERNEL_BUILD_USER_MEMORY_TESTS "Build unfinished user-memory tests" OFF)
-if(TWOKERNEL_BUILD_USER_MEMORY_TESTS)
-    list(APPEND KERNEL_SOURCES src/kernel/tests/user_memory_tests.cpp)
-endif()
 
 set(FLANTERM_SOURCES
     ${FLANTERM_DIR}/src/flanterm.c

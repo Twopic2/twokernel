@@ -15,7 +15,7 @@
     and handed straight to do_syscall_64, the same pointer syscall.s would
     pass. That covers the table, the argument mapping and the return path
     without needing a user address space -- but by the same token it cannot
-    see the SYSCALL/SYSRET transition. The ring 3 half lives in src/user.
+    see the SYSCALL/SYSRET transition.
 
     Requires init_syscalls() to have run (Cpu::init_cpu() does it).
 */
